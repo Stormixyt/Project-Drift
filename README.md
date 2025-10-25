@@ -331,8 +331,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/project-drift/issues)
-- **Discord**: [Join our server](https://discord.gg/project-drift)
+- **Issues**: [GitHub Issues](https://github.com/Stormixyt/project-drift/issues)
+- **Discord**: [Join our server](https://discord.gg/4mN7ChNJQf))
 - **Documentation**: [Full docs](docs/)
 
 ---
