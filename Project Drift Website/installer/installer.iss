@@ -35,6 +35,9 @@ Name: desktopicon; Description: "Create a &desktop icon"; GroupDescription: "Add
 ; [Run]
 ; Filename: "{app}\YourLauncherName.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
+[Run]
+Filename: "{app}\ProjectDriftLauncher.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
 ; To customize installer visuals, place an image file (recommended BMP) in this
 ; folder and set the WizardImageFile and WizardSmallImageFile below. Example:
 ; WizardImageFile={#MyAppName}InstallerImage.bmp
