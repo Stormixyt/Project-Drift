@@ -14,6 +14,10 @@ OutputBaseFilename={#OutputName}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+; Custom visuals (place InstallerImage.png and/or AppIcon.ico in this folder before building)
+WizardImageFile=InstallerImage.bmp
+WizardSmallImageFile=InstallerSmall.bmp
+SetupIconFile=AppIcon.ico
 
 [Files]
 ; All files copied from the staging folder created by the build script
