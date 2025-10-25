@@ -1,5 +1,9 @@
 name: Build Installer
 
+# Grant the minimal permissions required so the workflow can create releases using GITHUB_TOKEN
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
