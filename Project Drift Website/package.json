@@ -1,0 +1,22 @@
+{
+  "name": "project-drift-website",
+  "version": "1.0.0",
+  "description": "Project Drift - Classic Fortnite Experience Website",
+  "main": "project_drift_website (1).html",
+  "scripts": {
+    "start": "http-server . -p 3000 -o",
+    "dev": "http-server . -p 3000 -o --cors",
+    "serve": "http-server . -p 3000"
+  },
+  "keywords": [
+    "fortnite",
+    "gaming",
+    "nostalgia",
+    "classic"
+  ],
+  "author": "Project Drift",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
