@@ -22,6 +22,18 @@ jobs:
           choco install innosetup -y
         shell: pwsh
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build launcher (Electron)
+        run: |
+          cd launcher
+          npm ci
+          npm run build:win
+        shell: pwsh
+
       - name: Build installer
         run: |
           cd "Project Drift Website\installer"

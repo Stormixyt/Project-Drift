@@ -31,6 +31,16 @@ Get-ChildItem -Path $siteRoot -Force | Where-Object { $_.Name -ne 'installer' -a
     Copy-Item -Path $_.FullName -Destination $dest -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# If the launcher was built by CI, copy the produced EXE into staging and normalize the name
+$launcherDist = Join-Path $scriptRoot "..\launcher\dist"
+if (Test-Path $launcherDist) {
+    $exe = Get-ChildItem -Path $launcherDist -Filter *.exe -Recurse -File | Select-Object -First 1
+    if ($exe) {
+        Write-Host "Found launcher exe: $($exe.FullName). Copying into staging as ProjectDriftLauncher.exe"
+        Copy-Item -Path $exe.FullName -Destination (Join-Path $staging "ProjectDriftLauncher.exe") -Force
+    }
+}
+
 # Locate ISCC.exe (Inno Setup compiler)
 $possible = @(
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
