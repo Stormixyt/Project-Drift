@@ -21,3 +21,6 @@ CI build (recommended)
 Notes
 - The Inno Setup script assumes the launcher executable is named `ProjectDriftLauncher.exe` in the packaged files. If your launcher has a different name, update `installer.iss` accordingly.
 - Storing large binaries in the git repository is not recommended. The workflow uploads the EXE as a GitHub Release asset instead of keeping it in the repository history.
+
+CI trigger note:
+- This small markdown change was added to trigger the GitHub Actions workflow so the installer will be rebuilt and the Release updated.
