@@ -26,5 +26,16 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\ProjectDriftLauncher.exe"; 
 [Tasks]
 Name: desktopicon; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; Flags: unchecked
 
-[Run]
-Filename: "{app}\ProjectDriftLauncher.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+; NOTE: We removed the automatic post-install "Run" entry because the built installer
+; staging might not include the actual launcher executable (ProjectDriftLauncher.exe).
+; If you have a launcher executable you want to auto-run after install, add the
+; following [Run] entry back and ensure the executable is present in the staging folder:
+;
+; [Run]
+; Filename: "{app}\YourLauncherName.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+; To customize installer visuals, place an image file (recommended BMP) in this
+; folder and set the WizardImageFile and WizardSmallImageFile below. Example:
+; WizardImageFile={#MyAppName}InstallerImage.bmp
+; WizardSmallImageFile={#MyAppName}InstallerSmall.bmp
