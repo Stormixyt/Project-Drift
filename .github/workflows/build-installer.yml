@@ -46,6 +46,8 @@ jobs:
 
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: "Project Drift Website/installer/Output/Project-Drift-Complete-Installer-v1.0.0.exe"
