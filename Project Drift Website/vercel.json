@@ -48,5 +48,10 @@
       "source": "/Project%20Drift%20Website/:path*",
       "destination": "/Project Drift Website/:path*"
     }
+    ,
+    {
+      "source": "/((?!.*\\..*$).*)",
+      "destination": "/index.html"
+    }
   ]
 }
