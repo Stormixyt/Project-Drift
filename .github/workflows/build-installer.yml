@@ -1,0 +1,49 @@
+name: Build Installer
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Project Drift Website/**'
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Inno Setup (choco)
+        run: |
+          choco install innosetup -y
+        shell: pwsh
+
+      - name: Build installer
+        run: |
+          cd "Project Drift Website\installer"
+          .\build-installer.ps1
+        shell: pwsh
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-Drift-Complete-Installer
+          path: "Project Drift Website/installer/Output/Project-Drift-Complete-Installer-v1.0.0.exe"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.0
+          name: Project Drift v1.0.0
+          body: Automated release produced by CI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: "Project Drift Website/installer/Output/Project-Drift-Complete-Installer-v1.0.0.exe"
+          asset_name: Project-Drift-Complete-Installer-v1.0.0.exe
+          asset_content_type: application/x-msdownload
