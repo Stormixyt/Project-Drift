@@ -37,12 +37,16 @@
   ],
   "rewrites": [
     {
-      "source": "/Project Drift Website/:path*",
-      "destination": "/:path*"
+      "source": "/Project-Drift-Complete-Installer-v1.0.0.zip",
+      "destination": "/Project Drift Website/Project-Drift-Complete-Installer-v1.0.0.zip"
+    },
+    {
+      "source": "/Project-Drift-Launcher-v1.0.0.zip",
+      "destination": "/Project Drift Website/Project-Drift-Launcher-v1.0.0.zip"
     },
     {
       "source": "/Project%20Drift%20Website/:path*",
-      "destination": "/:path*"
+      "destination": "/Project Drift Website/:path*"
     }
   ]
 }
