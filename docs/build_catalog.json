@@ -1,0 +1,692 @@
+{
+  "builds": [
+    {
+      "name": "Fortnite 1.7.2",
+      "version": "1.7.2-CL-3700114",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.7.2.rar",
+      "size": "—",
+      "createdAt": "2017-10-17"
+    },
+    {
+      "name": "Fortnite 1.8",
+      "version": "1.8-CL-3724489",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.8.rar",
+      "size": "—",
+      "createdAt": "2017-10-25"
+    },
+    {
+      "name": "Fortnite 1.8.1",
+      "version": "1.8.1-CL-3729133",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.8.1.rar",
+      "size": "—",
+      "createdAt": "2017-11-02"
+    },
+    {
+      "name": "Fortnite 1.8.2",
+      "version": "1.8.2-CL-3741772",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.8.2.rar",
+      "size": "—",
+      "createdAt": "2017-11-08"
+    },
+    {
+      "name": "Fortnite 1.9",
+      "version": "1.9-CL-3757339",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.9.rar",
+      "size": "—",
+      "createdAt": "2017-11-14"
+    },
+    {
+      "name": "Fortnite 1.9.1",
+      "version": "1.9.1-CL-3775276",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.9.1.rar",
+      "size": "—",
+      "createdAt": "2017-11-29"
+    },
+    {
+      "name": "Fortnite 1.10",
+      "version": "1.10-CL-3790078",
+      "season": "Season 0 & 1",
+      "downloadUrl": "https://builds.rebootfn.org/1.10.rar",
+      "size": "—",
+      "createdAt": "2017-12-06"
+    },
+    {
+      "name": "Fortnite 1.11",
+      "version": "1.11-CL-3807424",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/1.11.rar",
+      "size": "—",
+      "createdAt": "2017-12-14"
+    },
+    {
+      "name": "Fortnite 2.1.0",
+      "version": "2.1.0-CL-3825894",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/2.1.0.rar",
+      "size": "—",
+      "createdAt": "2018-01-09"
+    },
+    {
+      "name": "Fortnite 2.2.0",
+      "version": "2.2.0-CL-3841827",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/2.2.0.rar",
+      "size": "—",
+      "createdAt": "2018-01-18"
+    },
+    {
+      "name": "Fortnite 2.3.0",
+      "version": "2.3.0-CL-3847564",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/2.3.0.rar",
+      "size": "—",
+      "createdAt": "2018-01-25"
+    },
+    {
+      "name": "Fortnite 2.4.0",
+      "version": "2.4.0-CL-3858292",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/2.4.0.rar",
+      "size": "—",
+      "createdAt": "2018-02-01"
+    },
+    {
+      "name": "Fortnite 2.4.2",
+      "version": "2.4.2-CL-3870737",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/2.4.2.rar",
+      "size": "—",
+      "createdAt": "2018-02-07"
+    },
+    {
+      "name": "Fortnite 2.5.0",
+      "version": "2.5.0-CL-3889387",
+      "season": "Season 2",
+      "downloadUrl": "https://builds.rebootfn.org/2.5.0.rar",
+      "size": "—",
+      "createdAt": "2018-02-13"
+    },
+    {
+      "name": "Fortnite 3.0",
+      "version": "3.0-CL-3901517",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.0.rar",
+      "size": "—",
+      "createdAt": "2018-02-21"
+    },
+    {
+      "name": "Fortnite 3.1",
+      "version": "3.1-CL-3915963",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.1.rar",
+      "size": "—",
+      "createdAt": "2018-02-28"
+    },
+    {
+      "name": "Fortnite 3.1.1",
+      "version": "3.1-CL-3917250",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.1.1.rar",
+      "size": "—",
+      "createdAt": "2018-02-28"
+    },
+    {
+      "name": "Fortnite 3.2",
+      "version": "3.2-CL-3935073",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.2.rar",
+      "size": "—",
+      "createdAt": "2018-03-08"
+    },
+    {
+      "name": "Fortnite 3.3",
+      "version": "3.3-CL-3942182",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.3.rar",
+      "size": "—",
+      "createdAt": "2018-03-15"
+    },
+    {
+      "name": "Fortnite 3.5",
+      "version": "3.5-CL-4008490",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.5.rar",
+      "size": "—",
+      "createdAt": "2018-04-11"
+    },
+    {
+      "name": "Fortnite 3.6",
+      "version": "3.6-CL-4019403",
+      "season": "Season 3",
+      "downloadUrl": "https://builds.rebootfn.org/3.6.rar",
+      "size": "—",
+      "createdAt": "2018-04-24"
+    },
+    {
+      "name": "Fortnite 4.0",
+      "version": "4.0-CL-4039451",
+      "season": "Season 4",
+      "downloadUrl": "https://builds.rebootfn.org/4.0.rar",
+      "size": "—",
+      "createdAt": "2018-05-02"
+    },
+    {
+      "name": "Fortnite 4.1",
+      "version": "4.1-CL-4053532",
+      "season": "Season 4",
+      "downloadUrl": "https://builds.rebootfn.org/4.1.rar",
+      "size": "—",
+      "createdAt": "2018-05-08"
+    },
+    {
+      "name": "Fortnite 4.2",
+      "version": "4.2-CL-4072250",
+      "season": "Season 4",
+      "downloadUrl": "https://builds.rebootfn.org/4.2.rar",
+      "size": "—",
+      "createdAt": "2018-05-16"
+    },
+    {
+      "name": "Fortnite 4.4",
+      "version": "4.4-CL-4117433",
+      "season": "Season 4",
+      "downloadUrl": "https://builds.rebootfn.org/4.4.rar",
+      "size": "—",
+      "createdAt": "2018-06-11"
+    },
+    {
+      "name": "Fortnite 4.5",
+      "version": "4.5-CL-4159770",
+      "season": "Season 4",
+      "downloadUrl": "https://builds.rebootfn.org/4.5.rar",
+      "size": "—",
+      "createdAt": "2018-06-27"
+    },
+    {
+      "name": "Fortnite 5.00",
+      "version": "5.00-CL-4204761",
+      "season": "Season 5",
+      "downloadUrl": "https://builds.rebootfn.org/5.00.rar",
+      "size": "—",
+      "createdAt": "2018-07-12"
+    },
+    {
+      "name": "Fortnite 5.0.1",
+      "version": "5.00-CL-4214610",
+      "season": "Season 5",
+      "downloadUrl": "https://builds.rebootfn.org/5.0.1.rar",
+      "size": "—",
+      "createdAt": "2018-07-12"
+    },
+    {
+      "name": "Fortnite 5.10",
+      "version": "5.10-CL-4240749",
+      "season": "Season 5",
+      "downloadUrl": "https://builds.rebootfn.org/5.10.rar",
+      "size": "—",
+      "createdAt": "2018-07-25"
+    },
+    {
+      "name": "Fortnite 5.21",
+      "version": "5.21-CL-4288479",
+      "season": "Season 5",
+      "downloadUrl": "https://builds.rebootfn.org/5.21.rar",
+      "size": "—",
+      "createdAt": "2018-08-15"
+    },
+    {
+      "name": "Fortnite 5.30",
+      "version": "5.30-CL-4305896",
+      "season": "Season 5",
+      "downloadUrl": "https://builds.rebootfn.org/5.30.rar",
+      "size": "—",
+      "createdAt": "2018-08-23"
+    },
+    {
+      "name": "Fortnite 5.40",
+      "version": "5.40-CL-4352937",
+      "season": "Season 5",
+      "downloadUrl": "https://builds.rebootfn.org/5.40.rar",
+      "size": "—",
+      "createdAt": "2018-09-05"
+    },
+    {
+      "name": "Fortnite 6.00",
+      "version": "6.00-CL-4395664",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.00.rar",
+      "size": "—",
+      "createdAt": "2018-09-27"
+    },
+    {
+      "name": "Fortnite 6.01",
+      "version": "6.01-CL-4417689",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.01.rar",
+      "size": "—",
+      "createdAt": "2018-10-03"
+    },
+    {
+      "name": "Fortnite 6.1.1",
+      "version": "6.01-CL-4424678",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.1.1.rar",
+      "size": "—",
+      "createdAt": "2018-10-03"
+    },
+    {
+      "name": "Fortnite 6.02",
+      "version": "6.02-CL-4442095",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.02.rar",
+      "size": "—",
+      "createdAt": "2018-10-10"
+    },
+    {
+      "name": "Fortnite 6.2.1",
+      "version": "6.02-CL-4461277",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.2.1.rar",
+      "size": "—",
+      "createdAt": "2018-10-10"
+    },
+    {
+      "name": "Fortnite 6.10",
+      "version": "6.10-CL-4464155",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.10.rar",
+      "size": "—",
+      "createdAt": "2018-10-16"
+    },
+    {
+      "name": "Fortnite 6.10.1",
+      "version": "6.10-CL-4476098",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.10.1.rar",
+      "size": "—",
+      "createdAt": "2018-10-16"
+    },
+    {
+      "name": "Fortnite 6.10.2",
+      "version": "6.10-CL-4480234",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.10.2.rar",
+      "size": "—",
+      "createdAt": "2018-10-16"
+    },
+    {
+      "name": "Fortnite 6.21",
+      "version": "6.21-CL-4526925",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.21.rar",
+      "size": "—",
+      "createdAt": "2018-11-01"
+    },
+    {
+      "name": "Fortnite 6.22",
+      "version": "6.22-CL-4543176",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.22.rar",
+      "size": "—",
+      "createdAt": "2018-11-04"
+    },
+    {
+      "name": "Fortnite 6.30",
+      "version": "6.30-CL-4573096",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.30.rar",
+      "size": "—",
+      "createdAt": "2018-11-13"
+    },
+    {
+      "name": "Fortnite 6.31",
+      "version": "6.31-CL-4573279",
+      "season": "Season 6",
+      "downloadUrl": "https://builds.rebootfn.org/6.31.rar",
+      "size": "—",
+      "createdAt": "2018-11-27"
+    },
+    {
+      "name": "Fortnite 7.00",
+      "version": "7.00-CL-4629139",
+      "season": "Season 7",
+      "downloadUrl": "https://builds.rebootfn.org/7.00.rar",
+      "size": "—",
+      "createdAt": "2018-12-06"
+    },
+    {
+      "name": "Fortnite 7.10",
+      "version": "7.10-CL-4667333",
+      "season": "Season 7",
+      "downloadUrl": "https://builds.rebootfn.org/7.10.rar",
+      "size": "—",
+      "createdAt": "2018-12-18"
+    },
+    {
+      "name": "Fortnite 7.20",
+      "version": "7.20-CL-4727874",
+      "season": "Season 7",
+      "downloadUrl": "https://builds.rebootfn.org/7.20.rar",
+      "size": "—",
+      "createdAt": "2019-01-22"
+    },
+    {
+      "name": "Fortnite 7.30",
+      "version": "7.30-CL-4834550",
+      "season": "Season 7",
+      "downloadUrl": "https://builds.rebootfn.org/7.30.rar",
+      "size": "—",
+      "createdAt": "2019-01-29"
+    },
+    {
+      "name": "Fortnite 7.40",
+      "version": "7.40-CL-5046157",
+      "season": "Season 7",
+      "downloadUrl": "https://builds.rebootfn.org/7.40.rar",
+      "size": "—",
+      "createdAt": "2019-02-13"
+    },
+    {
+      "name": "Fortnite 8.00",
+      "version": "8.00-CL-5203069",
+      "season": "Season 8",
+      "downloadUrl": "https://builds.rebootfn.org/8.00.rar",
+      "size": "—",
+      "createdAt": "2019-02-28"
+    },
+    {
+      "name": "Fortnite 8.20",
+      "version": "8.20-CL-N/A",
+      "season": "Season 8",
+      "downloadUrl": "https://builds.rebootfn.org/8.20.rar",
+      "size": "—",
+      "createdAt": "2019-03-27"
+    },
+    {
+      "name": "Fortnite 8.30",
+      "version": "8.30-CL-N/A",
+      "season": "Season 8",
+      "downloadUrl": "https://builds.rebootfn.org/8.30.rar",
+      "size": "—",
+      "createdAt": "2019-04-10"
+    },
+    {
+      "name": "Fortnite 8.40",
+      "version": "8.40-CL-N/A",
+      "season": "Season 8",
+      "downloadUrl": "https://builds.rebootfn.org/8.40.rar",
+      "size": "—",
+      "createdAt": "2019-04-17"
+    },
+    {
+      "name": "Fortnite 8.50",
+      "version": "8.50-CL-6058028",
+      "season": "Season 8",
+      "downloadUrl": "https://builds.rebootfn.org/8.50.rar",
+      "size": "—",
+      "createdAt": "2019-04-25"
+    },
+    {
+      "name": "Fortnite 8.51",
+      "version": "8.51-CL-N/A",
+      "season": "Season 8",
+      "downloadUrl": "https://builds.rebootfn.org/8.51.rar",
+      "size": "—",
+      "createdAt": "2019-05-02"
+    },
+    {
+      "name": "Fortnite 9.00",
+      "version": "9.00-CL-6337466",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.00.rar",
+      "size": "—",
+      "createdAt": "2019-05-09"
+    },
+    {
+      "name": "Fortnite 9.01",
+      "version": "9.01-CL-6428087",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.01.rar",
+      "size": "—",
+      "createdAt": "2019-05-15"
+    },
+    {
+      "name": "Fortnite 9.10",
+      "version": "9.10-CL-6639283",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.10.rar",
+      "size": "—",
+      "createdAt": "2019-05-19"
+    },
+    {
+      "name": "Fortnite 9.21",
+      "version": "9.21-CL-6922310",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.21.rar",
+      "size": "—",
+      "createdAt": "2019-06-12"
+    },
+    {
+      "name": "Fortnite 9.30",
+      "version": "9.30-CL-7095426",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.30.rar",
+      "size": "—",
+      "createdAt": "2019-07-09"
+    },
+    {
+      "name": "Fortnite 9.40",
+      "version": "9.40-CL-7315705",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.40.rar",
+      "size": "—",
+      "createdAt": "2019-07-17"
+    },
+    {
+      "name": "Fortnite 9.41",
+      "version": "9.41-CL-7609292",
+      "season": "Season 9",
+      "downloadUrl": "https://builds.rebootfn.org/9.41.rar",
+      "size": "—",
+      "createdAt": "2019-07-23"
+    },
+    {
+      "name": "Fortnite 10.00",
+      "version": "10.00-CL-7704164",
+      "season": "Season X/10",
+      "downloadUrl": "https://builds.rebootfn.org/10.00.rar",
+      "size": "—",
+      "createdAt": "2019-08-01"
+    },
+    {
+      "name": "Fortnite 10.10",
+      "version": "10.10-CL-7955722",
+      "season": "Season X/10",
+      "downloadUrl": "https://builds.rebootfn.org/10.10.rar",
+      "size": "—",
+      "createdAt": "2019-08-10"
+    },
+    {
+      "name": "Fortnite 10.20",
+      "version": "10.20-CL-8456527",
+      "season": "Season X/10",
+      "downloadUrl": "https://builds.rebootfn.org/10.20.rar",
+      "size": "—",
+      "createdAt": "2019-08-27"
+    },
+    {
+      "name": "Fortnite 10.31",
+      "version": "10.31-CL-8723043",
+      "season": "Season X/10",
+      "downloadUrl": "https://builds.rebootfn.org/10.31.rar",
+      "size": "—",
+      "createdAt": "2019-09-18"
+    },
+    {
+      "name": "Fortnite 10.40",
+      "version": "10.40-CL-9380822",
+      "season": "Season X/10",
+      "downloadUrl": "https://builds.rebootfn.org/10.40.rar",
+      "size": "—",
+      "createdAt": "2019-09-25"
+    },
+    {
+      "name": "Fortnite 11.00",
+      "version": "11.00-CL-9603448",
+      "season": "Season 11",
+      "downloadUrl": "https://builds.rebootfn.org/11.00.rar",
+      "size": "—",
+      "createdAt": "2019-10-15"
+    },
+    {
+      "name": "Fortnite 11.31",
+      "version": "11.31-CL-N/A",
+      "season": "Season 11",
+      "downloadUrl": "https://builds.rebootfn.org/11.31.rar",
+      "size": "—",
+      "createdAt": "2020-01-01"
+    },
+    {
+      "name": "Fortnite 12.00",
+      "version": "12.00-CL-N/A",
+      "season": "Season 12",
+      "downloadUrl": "https://builds.rebootfn.org/12.00.rar",
+      "size": "—",
+      "createdAt": "2020-02-20"
+    },
+    {
+      "name": "Fortnite 12.21",
+      "version": "12.21-CL-N/A",
+      "season": "Season 12",
+      "downloadUrl": "https://builds.rebootfn.org/12.21.rar",
+      "size": "—",
+      "createdAt": "2020-03-24"
+    },
+    {
+      "name": "Fortnite 12.41",
+      "version": "12.41-CL-12905909",
+      "season": "Season 12",
+      "downloadUrl": "https://builds.rebootfn.org/12.41.rar",
+      "size": "—",
+      "createdAt": "2020-04-21"
+    },
+    {
+      "name": "Fortnite 12.50",
+      "version": "12.50-CL-N/A",
+      "season": "Season 12",
+      "downloadUrl": "https://builds.rebootfn.org/12.50.rar",
+      "size": "—",
+      "createdAt": "2020-04-29"
+    },
+    {
+      "name": "Fortnite 12.61",
+      "version": "12.61-CL-N/A",
+      "season": "Season 12",
+      "downloadUrl": "https://builds.rebootfn.org/12.61.rar",
+      "size": "—",
+      "createdAt": "2020-05-26"
+    },
+    {
+      "name": "Fortnite 13.00",
+      "version": "13.00-CL-N/A",
+      "season": "Season 13",
+      "downloadUrl": "https://builds.rebootfn.org/13.00.rar",
+      "size": "—",
+      "createdAt": "2020-06-17"
+    },
+    {
+      "name": "Fortnite 13.40",
+      "version": "13.40-CL-14113327",
+      "season": "Season 13",
+      "downloadUrl": "https://builds.rebootfn.org/13.40.rar",
+      "size": "—",
+      "createdAt": "2020-09-27"
+    },
+    {
+      "name": "Fortnite 14.00",
+      "version": "14.00-CL-N/A",
+      "season": "Season 14",
+      "downloadUrl": "https://builds.rebootfn.org/14.00.rar",
+      "size": "—",
+      "createdAt": "2020-09-27"
+    },
+    {
+      "name": "Fortnite 14.40",
+      "version": "14.40-CL-14550713",
+      "season": "Season 14",
+      "downloadUrl": "https://builds.rebootfn.org/14.40.rar",
+      "size": "—",
+      "createdAt": "2020-10-21"
+    },
+    {
+      "name": "Fortnite 14.60",
+      "version": "14.60-CL-14786821",
+      "season": "Season 14",
+      "downloadUrl": "https://builds.rebootfn.org/14.60.rar",
+      "size": "—",
+      "createdAt": "2020-11-18"
+    },
+    {
+      "name": "Fortnite 15.30",
+      "version": "15.30-CL-15341163",
+      "season": "Season 15",
+      "downloadUrl": "https://builds.rebootfn.org/15.30.rar",
+      "size": "—",
+      "createdAt": "2021-02-02"
+    },
+    {
+      "name": "Fortnite 16.40",
+      "version": "16.40-CL-16218553",
+      "season": "Season 16",
+      "downloadUrl": "https://builds.rebootfn.org/16.40.rar",
+      "size": "—",
+      "createdAt": "2021-05-11"
+    },
+    {
+      "name": "Fortnite 17.30",
+      "version": "17.30-CL-N/A",
+      "season": "Season 17",
+      "downloadUrl": "https://builds.rebootfn.org/17.30.rar",
+      "size": "—",
+      "createdAt": "2021-07-27"
+    },
+    {
+      "name": "Fortnite 17.50",
+      "version": "17.50-CL-N/A",
+      "season": "Season 17",
+      "downloadUrl": "https://builds.rebootfn.org/17.50.rar",
+      "size": "—",
+      "createdAt": "2021-08-03"
+    },
+    {
+      "name": "Fortnite 18.40",
+      "version": "18.40-CL-N/A",
+      "season": "Season 18",
+      "downloadUrl": "https://builds.rebootfn.org/18.40.rar",
+      "size": "—",
+      "createdAt": "2021-11-03"
+    },
+    {
+      "name": "Fortnite 19.10",
+      "version": "19.10-CL-N/A",
+      "season": "Season 19",
+      "downloadUrl": "https://builds.rebootfn.org/19.10.rar",
+      "size": "—",
+      "createdAt": "2022-01-01"
+    },
+    {
+      "name": "Fortnite 20.40",
+      "version": "20.40-CL-N/A",
+      "season": "Season 20",
+      "downloadUrl": "https://builds.rebootfn.org/20.40.rar",
+      "size": "—",
+      "createdAt": "2022-06-01"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "project-drift-installer",
+  "version": "1.0.0",
+  "description": "Modern installer for Project Drift",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "dist": "electron-builder --win --publish never"
+  },
+  "author": "Project Drift",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "fs-extra": "^11.2.0",
+    "progress": "^2.0.3"
+  },
+  "build": {
+    "appId": "com.projectdrift.installer",
+    "productName": "Project Drift Installer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "!dist/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Project Drift Installer"
+    }
+  }
+}

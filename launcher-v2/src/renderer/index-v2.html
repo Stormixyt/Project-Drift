@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Drift</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles-v2.css">
+</head>
+<body>
+    <!-- Custom Window Controls -->
+    <div class="titlebar">
+        <div class="titlebar-drag-region"></div>
+        <div class="titlebar-title">PROJECT DRIFT V2</div>
+        <div class="titlebar-controls">
+            <button class="titlebar-button" id="minimize-btn">
+                <svg width="12" height="12"><path d="M0,6 L12,6" stroke="currentColor" stroke-width="1"/></svg>
+            </button>
+            <button class="titlebar-button" id="maximize-btn">
+                <svg width="12" height="12"><rect width="10" height="10" x="1" y="1" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+            </button>
+            <button class="titlebar-button close" id="close-btn">
+                <svg width="12" height="12"><path d="M1,1 L11,11 M11,1 L1,11" stroke="currentColor" stroke-width="1"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 40 40" fill="none">
+                            <circle cx="20" cy="20" r="18" stroke="url(#logo-gradient)" stroke-width="2"/>
+                            <path d="M15 13 L25 20 L15 27 Z" fill="url(#logo-gradient)"/>
+                            <defs>
+                                <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#00D9FF;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0066FF;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <span class="logo-text">DRIFT</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-section="library">
+                    <div class="nav-item-inner">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                        </svg>
+                        <span class="nav-label">Library</span>
+                    </div>
+                    <div class="nav-item-glow"></div>
+                </button>
+                
+                <button class="nav-item" data-section="downloads">
+                    <div class="nav-item-inner">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span class="nav-label">Downloads</span>
+                    </div>
+                    <div class="nav-item-glow"></div>
+                </button>
+                
+                <button class="nav-item" data-section="servers">
+                    <div class="nav-item-inner">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                        <span class="nav-label">Servers</span>
+                    </div>
+                    <div class="nav-item-glow"></div>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <div class="status-dot pulsing"></div>
+                    <span class="status-text" id="connection-status">Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-container">
+            <!-- Top Navbar -->
+            <header class="top-navbar">
+                <div class="navbar-left">
+                    <h1 class="page-title" id="page-title">Library</h1>
+                    <div class="page-breadcrumb">
+                        <span>Home</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                        <span id="breadcrumb-current">Library</span>
+                    </div>
+                </div>
+                <div class="navbar-right">
+                    <div class="search-box">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" placeholder="Search builds..." id="search-input">
+                    </div>
+                    <button class="icon-btn" title="Notifications">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="notification-badge">3</span>
+                    </button>
+                    <div class="user-profile">
+                        <div class="avatar">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Sections -->
+            <main class="content-area">
+                <!-- Library Section -->
+                <section id="library-section" class="content-section active">
+                    <div class="section-actions">
+                        <button id="import-btn" class="btn btn-primary" onclick="window.importBuild()">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Import Build
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadBuilds()">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="builds-list" class="builds-grid">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading builds...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Downloads Section -->
+                <section id="downloads-section" class="content-section">
+                    <div class="section-actions">
+                        <div class="filter-group">
+                            <label class="filter-label">Season</label>
+                            <select id="season-filter" class="select-field">
+                                <option value="all">All Seasons</option>
+                            </select>
+                        </div>
+                        <div class="stats-pill">
+                            <span id="catalog-count">0</span> builds available
+                        </div>
+                    </div>
+                    <div id="catalog-container" class="catalog-container">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading catalog...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Servers Section -->
+                <section id="servers-section" class="content-section">
+                    <div class="section-actions">
+                        <button class="btn btn-secondary" id="refresh-servers-btn">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                        <div class="stats-pill">
+                            <span class="server-count" id="server-count">0</span> servers online
+                        </div>
+                    </div>
+                    <div id="servers-list" class="servers-grid">
+                        <div class="empty-state">
+                            <div class="empty-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                                    <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                                    <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                                </svg>
+                            </div>
+                            <h3>No Servers Available</h3>
+                            <p>Waiting for game servers to come online</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- Footer -->
+            <footer class="app-footer">
+                <span class="footer-text">© Project Drift — <span class="footer-highlight">V2 Preview</span></span>
+                <div class="footer-version">v2.0.0</div>
+            </footer>
+        </div>
+    </div>
+
+  <script src="renderer-v2.js"></script>
+</body>
+</html>

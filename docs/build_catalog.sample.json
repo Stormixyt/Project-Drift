@@ -1,0 +1,14 @@
+{
+  "note": "Populate this file with builds you are legally allowed to distribute. Do NOT include copyrighted content you don't own rights to.",
+  "builds": [
+    {
+      "id": "s7-20",
+      "name": "Fortnite 7.20",
+      "version": "7.20-CL-4727874",
+      "season": "Season 7",
+      "downloadUrl": "https://your-domain.example.com/fortnite/7.20.zip",
+      "size": "18.2 GB",
+      "public": true
+    }
+  ]
+}

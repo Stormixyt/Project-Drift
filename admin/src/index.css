@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-surface-light;
+  }
+
+  body {
+    @apply bg-background text-text-primary antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-light rounded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/30;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    @apply bg-surface/50 backdrop-blur-glass border border-surface-light;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-primary text-black font-medium rounded-lg hover:bg-primary/90 transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-surface text-text-primary font-medium rounded-lg hover:bg-surface-light transition-colors border border-surface-light;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors;
+  }
+
+  .card {
+    @apply bg-surface border border-surface-light rounded-lg p-6;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 bg-surface border border-surface-light rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-text-secondary mb-2;
+  }
+}

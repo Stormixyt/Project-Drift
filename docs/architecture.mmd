@@ -1,0 +1,196 @@
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        UC[Unity Client<br/>Windows .exe<br/>IL2CPP Build]
+        Launcher[Launcher UI<br/>Build Import<br/>Server Browser]
+    end
+
+    subgraph "Networking Layer"
+        STUN[STUN Server<br/>NAT Detection]
+        TURN[TURN Server<br/>coturn<br/>Relay Fallback]
+        UDP[UDP/QUIC<br/>Port 7777]
+    end
+
+    subgraph "Backend Services"
+        GS[Rust Game Server<br/>30-60Hz Tick<br/>Authoritative]
+        MM[Matchmaking Service<br/>Node.js + Express<br/>JWT Auth]
+        WS[WebSocket Handler<br/>Socket.io<br/>Real-time Events]
+    end
+
+    subgraph "Data Layer"
+        Redis[(Redis<br/>Active Lobbies<br/>Sessions)]
+        PG[(PostgreSQL<br/>Users, Bans<br/>Build Metadata)]
+    end
+
+    subgraph "Admin & Management"
+        Admin[Admin Dashboard<br/>React + Tailwind<br/>Server Management]
+        API[REST API<br/>HTTPS<br/>Rate Limited]
+    end
+
+    subgraph "Build System"
+        Import[Build Importer<br/>GitHub/Local<br/>Validation]
+        Sandbox[Sandbox Environment<br/>Isolated Execution<br/>Resource Limits]
+        Storage[Build Storage<br/>Versioned<br/>Checksummed]
+    end
+
+    subgraph "Security & Anti-Cheat"
+        AC[Anti-Cheat<br/>Velocity Check<br/>Teleport Detection]
+        RateLimit[Rate Limiter<br/>Input Validation<br/>DDoS Protection]
+        TLS[TLS/SSL<br/>Certificate Manager]
+    end
+
+    %% Client Connections
+    UC -->|UDP Game State| UDP
+    UC -->|WebSocket| WS
+    UC -->|REST API| API
+    Launcher -->|Import Build| Import
+    
+    %% Networking Flow
+    UDP -->|Direct| GS
+    UDP -.->|NAT Blocked| STUN
+    STUN -.->|Relay| TURN
+    TURN -->|Relayed| GS
+    
+    %% Server Connections
+    GS -->|Validate Inputs| AC
+    GS -->|Store State| Redis
+    GS -->|Log Events| PG
+    
+    %% Matchmaking Flow
+    WS --> MM
+    MM --> Redis
+    MM --> PG
+    MM -->|Spawn Server| GS
+    
+    %% Admin Flow
+    Admin --> API
+    API --> TLS
+    API --> RateLimit
+    API --> MM
+    API --> GS
+    
+    %% Build Import Flow
+    Import -->|Download| Storage
+    Storage -->|Execute| Sandbox
+    Sandbox -->|Metadata| PG
+    
+    %% Security Layer
+    RateLimit --> MM
+    RateLimit --> GS
+    AC --> GS
+    TLS --> API
+
+    classDef client fill:#00D9FF,stroke:#00A3CC,color:#000
+    classDef server fill:#FF6B6B,stroke:#CC5555,color:#FFF
+    classDef data fill:#4ECDC4,stroke:#3DA39C,color:#000
+    classDef security fill:#FFE66D,stroke:#CCB857,color:#000
+    classDef network fill:#95E1D3,stroke:#77B3A6,color:#000
+    
+    class UC,Launcher client
+    class GS,MM,WS server
+    class Redis,PG data
+    class AC,RateLimit,TLS security
+    class STUN,TURN,UDP network
+```
+
+## Architecture Overview
+
+### Component Responsibilities
+
+#### Client Layer
+- **Unity Client**: Renders game, handles input, sends to server, reconciles state
+- **Launcher UI**: Build import, server browser, settings management
+
+#### Networking Layer
+- **UDP/QUIC**: Primary game state transport (low latency)
+- **STUN**: NAT type detection and direct connection attempt
+- **TURN**: Relay server fallback when direct UDP fails
+
+#### Backend Services
+- **Game Server**: Authoritative tick loop, physics simulation, input validation
+- **Matchmaking**: Lobby creation, JWT auth, session management
+- **WebSocket**: Real-time events for lobby updates and chat
+
+#### Data Layer
+- **Redis**: Ephemeral data (active lobbies, sessions, leaderboards)
+- **PostgreSQL**: Persistent data (users, bans, build metadata, logs)
+
+#### Admin & Management
+- **Admin Dashboard**: Two-column UI for server management
+- **REST API**: Server control, player management, analytics
+
+#### Build System
+- **Build Importer**: Downloads and validates custom builds
+- **Sandbox**: Isolated execution environment with resource limits
+- **Storage**: Versioned storage with integrity checksums
+
+#### Security & Anti-Cheat
+- **Anti-Cheat**: Server-side validation (velocity, teleport, input rate)
+- **Rate Limiter**: DDoS protection and input throttling
+- **TLS**: Encrypted communication for all HTTP/WebSocket traffic
+
+### Data Flow
+
+1. **Player Join Flow**:
+   - Client → Matchmaking (WebSocket): Request lobby
+   - Matchmaking → Redis: Check available lobbies
+   - Matchmaking → Game Server: Allocate player slot
+   - Game Server → Client: Connection details (IP, port, token)
+   - Client → Game Server: UDP handshake with JWT token
+
+2. **Game Tick Flow**:
+   - Client: Predict movement locally
+   - Client → Server: Send input snapshot (30-60Hz)
+   - Server: Validate input, apply physics
+   - Server → All Clients: Broadcast world state
+   - Client: Reconcile predicted state with server state
+
+3. **Build Import Flow**:
+   - User → Launcher: Select GitHub URL or local ZIP
+   - Launcher → Build Importer: Download and verify
+   - Build Importer → Sandbox: Execute in isolated environment
+   - Sandbox → PostgreSQL: Store build metadata
+   - Launcher: Display available builds in UI
+
+### Network Topology
+
+```
+Internet
+   │
+   ├─── Client A (Direct UDP) ────────┐
+   │                                  │
+   ├─── Client B (NAT, via TURN) ─────┤
+   │                                  │
+   └─── Admin Dashboard (HTTPS) ──────┤
+                                      │
+                                   [Server]
+                                      │
+                    ├─────────────────┼─────────────────┐
+                    │                 │                 │
+                [Redis]          [PostgreSQL]      [coturn]
+```
+
+### Security Layers
+
+1. **Transport Security**: TLS 1.3 for all HTTP/WebSocket
+2. **Authentication**: JWT (HS256) tokens with 1-hour expiry
+3. **Authorization**: Role-based access (player, admin, moderator)
+4. **Rate Limiting**: Per-IP and per-user limits
+5. **Input Validation**: Server-side validation of all inputs
+6. **Anti-Cheat**: Heuristic detection of impossible movements
+7. **Sandboxing**: Imported builds run in restricted containers
+
+### Scalability
+
+- **Horizontal Scaling**: Multiple game server instances via K8s
+- **Load Balancing**: Nginx reverse proxy for matchmaking API
+- **Database Replication**: PostgreSQL read replicas
+- **Cache Layer**: Redis for frequently accessed data
+- **CDN**: Static assets served via CDN (admin dashboard)
+
+### Monitoring & Observability
+
+- **Metrics**: Prometheus + Grafana
+- **Logging**: Structured JSON logs → Elasticsearch
+- **Tracing**: OpenTelemetry for distributed tracing
+- **Alerts**: Critical errors trigger Discord/email notifications

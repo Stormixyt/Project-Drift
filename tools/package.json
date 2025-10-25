@@ -1,0 +1,12 @@
+{
+  "name": "project-drift-tools",
+  "version": "1.0.0",
+  "description": "Build patcher and utilities for Project Drift",
+  "type": "module",
+  "scripts": {
+    "patch": "node build-patcher.js"
+  },
+  "keywords": ["fortnite", "patcher", "project-drift"],
+  "author": "Project Drift",
+  "license": "MIT"
+}

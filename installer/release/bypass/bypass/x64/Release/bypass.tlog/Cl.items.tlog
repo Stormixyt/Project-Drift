@@ -1,0 +1,6 @@
+C:\Users\Stormix\Downloads\Project Drift\bypass\dllmain.cpp;C:\Users\Stormix\Downloads\Project Drift\bypass\bypass\x64\Release\dllmain.obj
+C:\Users\Stormix\Downloads\Project Drift\bypass\minhook\buffer.c;C:\Users\Stormix\Downloads\Project Drift\bypass\bypass\x64\Release\buffer.obj
+C:\Users\Stormix\Downloads\Project Drift\bypass\minhook\hook.c;C:\Users\Stormix\Downloads\Project Drift\bypass\bypass\x64\Release\hook.obj
+C:\Users\Stormix\Downloads\Project Drift\bypass\minhook\trampoline.c;C:\Users\Stormix\Downloads\Project Drift\bypass\bypass\x64\Release\trampoline.obj
+C:\Users\Stormix\Downloads\Project Drift\bypass\minhook\hde\hde32.c;C:\Users\Stormix\Downloads\Project Drift\bypass\bypass\x64\Release\hde32.obj
+C:\Users\Stormix\Downloads\Project Drift\bypass\minhook\hde\hde64.c;C:\Users\Stormix\Downloads\Project Drift\bypass\bypass\x64\Release\hde64.obj

@@ -1,0 +1,107 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: drift-postgres
+    environment:
+      POSTGRES_USER: drift
+      POSTGRES_PASSWORD: drift
+      POSTGRES_DB: drift
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - drift-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drift"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: drift-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - drift-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # coturn TURN/STUN Server
+  coturn:
+    image: coturn/coturn:latest
+    container_name: drift-coturn
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49152-49252:49152-49252/udp"
+    volumes:
+      - ./docker/coturn/turnserver.conf:/etc/coturn/turnserver.conf
+    networks:
+      - drift-network
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+
+  # Matchmaking Service
+  matchmaking:
+    build:
+      context: ./matchmaking
+      dockerfile: ../docker/matchmaking.dev.Dockerfile
+    container_name: drift-matchmaking
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgres://drift:drift@postgres:5432/drift
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-in-production
+      CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: debug
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - drift-network
+    volumes:
+      - ./matchmaking:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # Admin Dashboard
+  admin:
+    build:
+      context: ./admin
+      dockerfile: ../docker/admin.dev.Dockerfile
+    container_name: drift-admin
+    environment:
+      VITE_API_URL: http://localhost:8080/api
+      VITE_WS_URL: ws://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - matchmaking
+    networks:
+      - drift-network
+    volumes:
+      - ./admin:/app
+      - /app/node_modules
+    command: npm run dev
+
+networks:
+  drift-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
