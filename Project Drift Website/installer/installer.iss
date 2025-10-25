@@ -21,7 +21,7 @@ Source: "staging\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ig
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\ProjectDriftLauncher.exe"
-Name: "{desktop}\{#MyAppName}"; Filename: "{app}\ProjectDriftLauncher.exe"; Tasks: desktopicon
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\ProjectDriftLauncher.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: desktopicon; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; Flags: unchecked
