@@ -34,3 +34,5 @@ Post-install run note
 Installer image / icon
 - To include the image you attached as the installer's wizard image or small image, convert it to a BMP (recommended) or ICO for the installer icon, place the file in this folder, and set the `WizardImageFile` and `WizardSmallImageFile` values in `installer.iss` as noted in the script comments.
 
+CI retrigger note: small no-op update to trigger workflow run.
+
