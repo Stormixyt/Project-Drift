@@ -79,9 +79,15 @@ if (Test-Path $pngPath) {
     # Save main BMP (to staging and to script folder)
     $img.Save($bmpOut, [System.Drawing.Imaging.ImageFormat]::Bmp)
     $img.Save($bmpOutScript, [System.Drawing.Imaging.ImageFormat]::Bmp)
-    # Create ICO from the image
+    # Create ICO from the image. Resize to 256x256 (electron-builder requires >=256) before creating the icon.
     $bmp = New-Object System.Drawing.Bitmap $img
-    $icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+    try {
+        $resized = New-Object System.Drawing.Bitmap $bmp, 256, 256
+    } catch {
+        # fallback to original if resizing fails
+        $resized = $bmp
+    }
+    $icon = [System.Drawing.Icon]::FromHandle($resized.GetHicon())
     $fs = [System.IO.File]::Open($icoOut, [System.IO.FileMode]::Create)
     $icon.Save($fs)
     $fs.Close()
@@ -90,6 +96,7 @@ if (Test-Path $pngPath) {
     $icon.Save($fs2)
     $fs2.Close()
     $icon.Dispose()
+    if ($resized -ne $bmp) { $resized.Dispose() }
     $bmp.Dispose()
     $img.Dispose()
 }
@@ -155,6 +162,20 @@ if (-not $ISCC) {
 Write-Host "Using ISCC: $ISCC"
 
 Push-Location $scriptRoot
+## Ensure previous output is removed (ISCC sometimes fails if existing file is locked)
+$outputDir = Join-Path $scriptRoot "Output"
+$outputExe = Join-Path $outputDir "Project-Drift-Complete-Installer-v1.0.0.exe"
+if (Test-Path $outputExe) {
+    Write-Host "Removing existing output: $outputExe"
+    try {
+        Remove-Item -Path $outputExe -Force -ErrorAction Stop
+    } catch {
+        Write-Error "Cannot remove existing output file. It may be in use by another process (close running installers) and try again: $outputExe"
+        Pop-Location
+        exit 1
+    }
+}
+
 & $ISCC (Join-Path $scriptRoot "installer.iss")
 Pop-Location
 

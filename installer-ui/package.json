@@ -1,0 +1,36 @@
+{
+  "name": "installer-ui",
+  "version": "1.0.0",
+  "main": "main.js",
+  "description": "Custom Project Drift Installer UI",
+  "author": "Stormixyt",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.6.0"
+  },
+  "build": {
+    "appId": "com.projectdrift.installer",
+    "productName": "Project Drift Installer",
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "ProjectDrift-Installer.exe"
+    },
+    "compression": "store",
+    "extraFiles": [
+      {
+        "from": "../launcher/dist/Project-Drift-Launcher-v1.0.0.zip",
+        "to": "launcher.zip"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}

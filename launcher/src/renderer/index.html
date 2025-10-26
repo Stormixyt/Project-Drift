@@ -23,8 +23,32 @@
     </div>
   </div>
 
+  <!-- Login Screen -->
+  <div class="login-screen" id="login-screen">
+    <div class="login-container">
+      <div class="login-header">
+        <h1>Project <span class="accent">Drift</span></h1>
+        <p>Welcome back! Please sign in with Discord to continue.</p>
+      </div>
+      
+      <div class="login-content">
+        <button class="discord-login-btn" id="discord-login-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419-.0189 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
+          </svg>
+          Sign in with Discord
+        </button>
+        
+        <div class="login-footer">
+          <p>Join our Discord server for the latest updates and support.</p>
+          <a href="https://discord.gg/4mN7ChNJQf" target="_blank" class="discord-link">discord.gg/4mN7ChNJQf</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Container -->
-  <div class="container">
+  <div class="container" id="main-app" style="display: none;">
     <!-- Sidebar -->
     <div class="sidebar">
       <div class="logo">
@@ -68,6 +92,13 @@
           <span>Shop</span>
         </a>
         
+        <a href="#" class="nav-item" data-view="catalog">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>Catalog</span>
+        </a>
+        
         <a href="#" class="nav-item" data-view="downloads">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/>
@@ -84,14 +115,20 @@
           <span>Need help?</span>
         </button>
         <button class="discord-btn">Discord</button>
-        
-        <div class="user-profile">
-          <img src="https://preview.redd.it/various-pictures-of-the-saudi-special-forces-nssg-sof-64th-v0-113s9qtpbi4b1.png?width=640&crop=smart&auto=webp&s=5e80ddde13b853ef05142bf17d4814365f0e5374" alt="User avatar" class="avatar">
-          <div class="user-info">
-            <span class="username" id="username">Loading...</span>
-            <span class="user-status">Member</span>
+
+        <!-- Authentication Section -->
+        <div id="user-info" class="user-profile" style="display: none;">
+          <div class="user-avatar"></div>
+          <div class="user-details">
+            <div class="user-name"></div>
+            <div class="user-email"></div>
+          </div>
+          <div class="user-actions">
+            <button id="logout-btn" class="logout-btn">Logout</button>
           </div>
         </div>
+
+        <button id="login-btn" class="login-btn">Sign In</button>
       </div>
     </div>
 
@@ -194,6 +231,12 @@
         <div class="view-header">
           <h2>Library</h2>
           <div class="view-controls">
+            <button class="btn-secondary" id="import-build-btn">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/>
+              </svg>
+              Import Build
+            </button>
             <span>Sort by:</span>
             <select class="sort-select">
               <option>Version</option>
@@ -212,6 +255,97 @@
 
         <div class="builds-grid" id="builds-grid">
           <!-- Builds will be dynamically loaded here -->
+        </div>
+      </div>
+
+      <!-- Catalog View -->
+      <div class="view" id="catalog-view">
+        <div class="view-header">
+          <h2>Build Catalog</h2>
+          <div class="view-controls">
+            <div class="catalog-filters">
+              <select id="catalog-season-filter" class="sort-select">
+                <option value="">All Seasons</option>
+                <option value="Season 1">Season 1</option>
+                <option value="Season 2">Season 2</option>
+                <option value="Season 3">Season 3</option>
+                <option value="Season 4">Season 4</option>
+                <option value="Season 5">Season 5</option>
+                <option value="Season 6">Season 6</option>
+                <option value="Season 7">Season 7</option>
+                <option value="Season 8">Season 8</option>
+                <option value="Season 9">Season 9</option>
+                <option value="Season 10">Season 10</option>
+                <option value="Season 11">Season 11</option>
+                <option value="Season 12">Season 12</option>
+                <option value="Season 13">Season 13</option>
+                <option value="Season 14">Season 14</option>
+                <option value="Season 15">Season 15</option>
+                <option value="Season 16">Season 16</option>
+                <option value="Season 17">Season 17</option>
+                <option value="Season 18">Season 18</option>
+                <option value="Season 19">Season 19</option>
+                <option value="Season 20">Season 20</option>
+                <option value="Season 21">Season 21</option>
+                <option value="Season 22">Season 22</option>
+                <option value="Season 23">Season 23</option>
+                <option value="Season 24">Season 24</option>
+                <option value="Season 25">Season 25</option>
+                <option value="Season 26">Season 26</option>
+                <option value="Season 27">Season 27</option>
+                <option value="Season 28">Season 28</option>
+                <option value="Season 29">Season 29</option>
+                <option value="Season 30">Season 30</option>
+                <option value="Season 31">Season 31</option>
+                <option value="Season 32">Season 32</option>
+                <option value="Season 33">Season 33</option>
+                <option value="Season 34">Season 34</option>
+                <option value="Season 35">Season 35</option>
+                <option value="Online Testing">Online Testing</option>
+                <option value="Pre-Season">Pre-Season</option>
+              </select>
+              <input type="text" id="catalog-search" class="catalog-search" placeholder="Search builds...">
+            </div>
+          </div>
+        </div>
+
+        <div class="catalog-content">
+          <div class="catalog-loading" id="catalog-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading build catalog...</p>
+          </div>
+          <div class="catalog-grid" id="catalog-grid">
+            <!-- Build cards will be dynamically loaded here -->
+          </div>
+          <div class="catalog-empty" id="catalog-empty" style="display: none;">
+            <h3>No builds found</h3>
+            <p>Try adjusting your search or filters.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Downloads View -->
+      <div class="view" id="downloads-view">
+        <div class="view-header">
+          <h2>Downloads</h2>
+          <div class="view-controls">
+            <button class="btn-secondary" id="download-settings-btn">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/>
+              </svg>
+              Settings
+            </button>
+          </div>
+        </div>
+
+        <div class="downloads-content">
+          <div class="downloads-list" id="downloads-list">
+            <!-- Active downloads will appear here -->
+          </div>
+          <div class="downloads-empty" id="downloads-empty">
+            <h3>No Active Downloads</h3>
+            <p>Download builds from the catalog to get started!</p>
+          </div>
         </div>
       </div>
 
@@ -393,6 +527,35 @@
       </div>
     </div>
   </div>
+
+  <!-- Download Settings Modal -->
+  <div class="download-settings-modal" id="download-settings-modal">
+    <div class="download-settings-content">
+      <div class="download-settings-header">
+        <h3>Download Settings</h3>
+        <button class="download-settings-close" id="close-download-settings">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="download-settings-body">
+        <div class="form-group">
+          <label for="download-path">Download Path</label>
+          <input type="text" id="download-path" class="download-settings-path" placeholder="C:\Users\Username\Downloads\Project Drift Builds" readonly>
+          <button class="btn-secondary" id="browse-download-path" style="margin-top: 8px; width: auto;">Browse...</button>
+        </div>
+      </div>
+
+      <div class="download-settings-actions">
+        <button class="btn-secondary" id="cancel-download-settings">Cancel</button>
+        <button class="btn-primary" id="save-download-settings">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Authentication Modal (will be created dynamically) -->
 
   <script src="renderer.js"></script>
 </body>

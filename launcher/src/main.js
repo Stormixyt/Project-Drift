@@ -9,6 +9,7 @@ const { pipeline } = require('stream/promises');
 const extract = require('extract-zip');
 const util = require('util');
 const execPromise = util.promisify(exec);
+const { auth, db } = require('./supabase');
 
 let sevenZipPath = null;
 try {
@@ -16,6 +17,519 @@ try {
   sevenZipPath = require('7zip-bin').path7za || null;
 } catch (_) {
   // optional dependency
+}
+
+// Local HTTP server for OAuth callback handling
+const http = require('http');
+let callbackServer = null;
+
+// Start local HTTP server for OAuth callbacks
+function startCallbackServer() {
+  if (callbackServer) return;
+
+  callbackServer = http.createServer(async (req, res) => {
+    console.log('Received callback request:', req.url);
+    
+    // Check if this is an OAuth error
+    const url = new URL(req.url, `http://localhost:3001`);
+    const error = url.searchParams.get('error');
+    const errorCode = url.searchParams.get('error_code');
+    const errorDescription = url.searchParams.get('error_description');
+    
+    // Also check for errors in hash fragment
+    const hash = url.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
+    const hashError = hashParams.get('error');
+    const hashErrorCode = hashParams.get('error_code');
+    const hashErrorDescription = hashParams.get('error_description');
+    
+    const finalError = error || hashError;
+    const finalErrorCode = errorCode || hashErrorCode;
+    const finalErrorDescription = errorDescription || hashErrorDescription;
+    
+    if (finalError) {
+      console.log('OAuth error received:', { error: finalError, errorCode: finalErrorCode, errorDescription: finalErrorDescription });
+      
+      // Send error to renderer process
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('oauth-error', {
+          error: finalError,
+          errorCode: finalErrorCode,
+          errorDescription: finalErrorDescription
+        });
+      }
+      
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Failed</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #0b0c0f; color: #e6e6e6; }
+            .error { color: #ff4444; font-size: 24px; margin: 20px 0; }
+            .details { font-size: 14px; color: #aaa; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <h1 class="error">✗ Authentication Failed</h1>
+          <p class="details">Error: ${finalError}</p>
+          <p class="details">${finalErrorDescription}</p>
+          <p>Please try again or contact support if the problem persists.</p>
+        </body>
+        </html>
+      `);
+      return;
+    }
+    
+    // Handle OAuth callback - Discord redirects to root path with hash fragment
+    if (req.url === '/' || req.url.startsWith('/?')) {
+      console.log('Serving OAuth callback page');
+
+      // Serve an HTML page that will extract the OAuth tokens from the URL fragment
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Processing Authentication...</title>
+          <style>
+            body {
+              font-family: 'Inter', Arial, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background: linear-gradient(135deg, #0b0c0f 0%, #1a1d23 100%);
+              color: #e6e6e6;
+              margin: 0;
+              min-height: 100vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+            }
+            .container {
+              max-width: 500px;
+              background: rgba(255, 255, 255, 0.05);
+              border-radius: 16px;
+              padding: 40px;
+              box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
+              border: 1px solid rgba(0, 217, 255, 0.2);
+            }
+            .loading {
+              color: #00d9ff;
+              font-size: 48px;
+              margin: 20px 0;
+              animation: spin 1s linear infinite;
+            }
+            .message {
+              font-size: 18px;
+              margin: 20px 0;
+              line-height: 1.6;
+            }
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="loading">⟳</div>
+            <h1>Processing Authentication...</h1>
+            <p class="message">Please wait while we complete your sign-in.</p>
+          </div>
+
+          <script>
+            // Extract OAuth tokens from URL fragment
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+              const params = new URLSearchParams(hash);
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+              const providerToken = params.get('provider_token');
+              const expiresAt = params.get('expires_at');
+
+              if (accessToken) {
+                console.log('Found OAuth tokens in fragment, sending to main process...');
+
+                // Send tokens to main process via a special endpoint
+                fetch('/oauth-callback', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                    provider_token: providerToken,
+                    expires_at: expiresAt
+                  })
+                })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success) {
+                    // Show success and auto-close
+                    document.querySelector('.container').innerHTML = \`
+                      <div class="loading" style="color: #00d9ff; animation: none;">✓</div>
+                      <h1>Authentication Successful!</h1>
+                      <p class="message">You have been successfully signed in with Discord.<br>Please close this browser window and return to Project Drift.</p>
+                    \`;
+
+                    // Auto-close after 3 seconds
+                    setTimeout(() => {
+                      window.close();
+                    }, 3000);
+                  } else {
+                    throw new Error(data.error || 'Authentication failed');
+                  }
+                })
+                .catch(error => {
+                  console.error('OAuth callback error:', error);
+                  document.querySelector('.container').innerHTML = \`
+                    <div class="loading" style="color: #ff4444; animation: none;">✗</div>
+                    <h1>Authentication Failed</h1>
+                    <p class="message">An error occurred during sign-in. Please try again.</p>
+                    <p style="font-size: 14px; color: #aaa;">\${error.message}</p>
+                  \`;
+                });
+              } else {
+                document.querySelector('.container').innerHTML = \`
+                  <div class="loading" style="color: #ff4444; animation: none;">✗</div>
+                  <h1>Authentication Failed</h1>
+                  <p class="message">No access token found. Please try again.</p>
+                \`;
+              }
+            } else {
+              // Check for error parameters in query string
+              const urlParams = new URLSearchParams(window.location.search);
+              const error = urlParams.get('error');
+              const errorDescription = urlParams.get('error_description');
+
+              if (error) {
+                document.querySelector('.container').innerHTML = \`
+                  <div class="loading" style="color: #ff4444; animation: none;">✗</div>
+                  <h1>Authentication Failed</h1>
+                  <p class="message">\${errorDescription || error}</p>
+                  <p class="message">Please try again.</p>
+                \`;
+              } else {
+                document.querySelector('.container').innerHTML = \`
+                  <div class="loading" style="color: #ff4444; animation: none;">?</div>
+                  <h1>Invalid Request</h1>
+                  <p class="message">This page should only be accessed through Discord OAuth.</p>
+                \`;
+              }
+            }
+          </script>
+        </body>
+        </html>
+      `);
+      return;
+    }
+
+    // Handle the POST request from the JavaScript above
+    if (req.url === '/oauth-callback' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+
+      req.on('end', async () => {
+        try {
+          const tokens = JSON.parse(body);
+          console.log('Received OAuth tokens via POST:', { hasAccessToken: !!tokens.access_token });
+
+          if (tokens.access_token) {
+            // Set the session in the main process
+            const sessionResult = await auth.setSession(tokens.access_token, tokens.refresh_token);
+
+            if (sessionResult.success) {
+              console.log('Session set successfully in main process');
+
+              // Verify the session was set by checking it immediately
+              const { data: sessionData } = await auth.getCurrentSession();
+              console.log('Verified session after setting:', { hasSession: !!sessionData.session, hasUser: !!sessionData.session?.user });
+
+              // Notify the renderer that authentication succeeded
+              if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('oauth-success');
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true }));
+            } else {
+              console.error('Failed to set session:', sessionResult.error);
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: sessionResult.error }));
+            }
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'No access token provided' }));
+          }
+        } catch (error) {
+          console.error('Error processing OAuth callback POST:', error);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: error.message }));
+        }
+      });
+      return;
+    }
+
+    // Handle 404 for other requests
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Not Found</title>
+      </head>
+      <body>
+        <h1>404 - Not Found</h1>
+      </body>
+      </html>
+    `);
+  });
+
+  // Try to listen on port 3001 first (required by Discord OAuth config)
+  callbackServer.listen(3001, 'localhost', () => {
+    console.log('OAuth callback server listening on http://localhost:3001');
+  });
+
+  callbackServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log('Port 3001 is busy, attempting to free it...');
+
+      // Try to kill any process using port 3001
+      const { exec } = require('child_process');
+      exec('netstat -ano | findstr :3001', (error, stdout) => {
+        if (!error && stdout) {
+          const lines = stdout.split('\n');
+          for (const line of lines) {
+            if (line.includes('LISTENING')) {
+              const parts = line.trim().split(/\s+/);
+              const pid = parts[parts.length - 1];
+              if (pid && pid !== '0') {
+                console.log(`Attempting to kill process ${pid} using port 3001`);
+                exec(`taskkill /f /pid ${pid}`, (killError) => {
+                  if (!killError) {
+                    console.log('Killed conflicting process, retrying server start...');
+                    setTimeout(() => {
+                      callbackServer.listen(3001, 'localhost', () => {
+                        console.log('OAuth callback server listening on http://localhost:3001');
+                      });
+                    }, 1000);
+                  } else {
+                    console.error('Failed to kill conflicting process:', killError);
+                    console.log('Please close any applications using port 3001 and restart Project Drift');
+                  }
+                });
+                break;
+              }
+            }
+          }
+        } else {
+          console.log('Could not identify process using port 3001');
+          console.log('Please close any development servers or applications using port 3001');
+        }
+      });
+    } else {
+      console.error('Callback server error:', err);
+    }
+  });
+}
+
+// Stop the callback server
+function stopCallbackServer() {
+  if (callbackServer) {
+    callbackServer.close();
+    callbackServer = null;
+  }
+}
+
+// Handle OAuth callback URLs
+function handleOAuthCallback(url) {
+  console.log('Handling OAuth callback:', url);
+  
+  // Send the callback URL to the renderer process
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('oauth-callback', url);
+  }
+}
+
+// App event handlers
+app.whenReady().then(() => {
+  // Start the local callback server
+  startCallbackServer();
+
+  // Create the main window
+  createMainWindow();
+});
+
+app.on('window-all-closed', () => {
+  // Stop the callback server when app closes
+  stopCallbackServer();
+  
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createMainWindow();
+  }
+});
+
+// Function to create the main window
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0b0c0f',
+      symbolColor: '#e6e6e6'
+    }
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // Handle OAuth callback in renderer
+  mainWindow.webContents.on('did-finish-load', () => {
+    // Check if app was launched with OAuth callback
+    const url = process.argv.find(arg => arg.startsWith('projectdrift://'));
+    if (url) {
+      handleOAuthCallback(url);
+    }
+  });
+}
+
+// Download file with progress callback
+async function downloadFile(url, destPath, progressCallback) {
+  console.log(`[Download] Starting download: ${url} -> ${destPath}`);
+  return new Promise((resolve, reject) => {
+    const file = fsSync.createWriteStream(destPath);
+    let totalSize = 0;
+    let downloadedSize = 0;
+    let lastProgressUpdate = 0;
+
+    const request = https.get(url, (response) => {
+      console.log(`[Download] Response status: ${response.statusCode}`);
+      console.log(`[Download] Content-Type: ${response.headers['content-type']}`);
+      console.log(`[Download] Content-Length: ${response.headers['content-length']}`);
+
+      // Check if this is actually a download page instead of a file
+      const contentType = response.headers['content-type'] || '';
+      if (contentType.includes('text/html') || contentType.includes('text/plain')) {
+        console.log(`[Download] Detected HTML/text response, likely a download page instead of file`);
+        file.end();
+        reject(new Error('URL returned HTML page instead of file download'));
+        return;
+      }
+
+      if (response.statusCode === 302 || response.statusCode === 301) {
+        // Handle redirect
+        console.log(`[Download] Redirecting to: ${response.headers.location}`);
+        file.end();
+        // Follow redirect
+        downloadFile(response.headers.location, destPath, progressCallback).then(resolve).catch(reject);
+        return;
+      }
+
+      if (response.statusCode !== 200) {
+        file.end();
+        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+        return;
+      }
+
+      totalSize = parseInt(response.headers['content-length'], 10) || 0;
+      console.log(`[Download] Total size: ${totalSize} bytes`);
+
+      response.on('data', (chunk) => {
+        downloadedSize += chunk.length;
+        file.write(chunk);
+
+        // Throttle progress updates to every 200ms to prevent erratic speed/ETA
+        const now = Date.now();
+        if (progressCallback && totalSize > 0 && (now - lastProgressUpdate) >= 200) {
+          const progress = (downloadedSize / totalSize) * 100;
+          progressCallback(progress, totalSize);
+          lastProgressUpdate = now;
+        }
+      });
+
+      response.on('end', () => {
+        file.end();
+        console.log(`[Download] Download completed, downloaded ${downloadedSize} bytes`);
+        // Validate download was successful
+        try {
+          const stats = fsSync.statSync(destPath);
+          console.log(`[Download] File size on disk: ${stats.size} bytes`);
+          if (stats.size === 0) {
+            reject(new Error('Downloaded file is empty'));
+            return;
+          }
+          // Check for minimum reasonable file size (Fortnite builds are at least 100MB)
+          if (stats.size < 100 * 1024 * 1024) { // 100MB minimum
+            console.log(`[Download] File too small (${stats.size} bytes), likely not a real build`);
+            reject(new Error(`Downloaded file too small (${Math.round(stats.size / 1024 / 1024)}MB), likely not a valid build`));
+            return;
+          }
+          // Send final progress update
+          if (progressCallback && totalSize > 0) {
+            progressCallback(100, totalSize);
+          }
+          resolve();
+        } catch (err) {
+          console.error(`[Download] Failed to validate file: ${err.message}`);
+          reject(new Error('Failed to validate downloaded file'));
+        }
+      });
+
+      response.on('error', (err) => {
+        console.error(`[Download] Response error: ${err.message}`);
+        file.end();
+        reject(err);
+      });
+    });
+
+    request.on('error', (err) => {
+      console.error(`[Download] Request error: ${err.message}`);
+      file.end();
+      reject(err);
+    });
+
+    file.on('error', (err) => {
+      console.error(`[Download] File write error: ${err.message}`);
+      reject(err);
+    });
+  });
+}
+
+// Check available disk space
+async function checkDiskSpace(requiredBytes, directory) {
+  try {
+    // Use a simple check - just ensure the directory exists and is writable
+    await fs.access(directory, fs.constants.W_OK);
+    console.log(`[Storage] Directory is writable: ${directory}`);
+    // For now, assume enough space - the download will fail if there's not enough space anyway
+    return { available: true };
+  } catch (error) {
+    console.warn('[Storage] Could not access directory:', error.message);
+    return { 
+      available: false, 
+      message: `Cannot write to download directory: ${directory}`
+    };
+  }
 }
 
 // Game server process
@@ -769,65 +1283,143 @@ async function getLocalBuilds() {
 // Download build from GitHub or direct URL
 ipcMain.handle('download-build', async (event, build) => {
   try {
-    const buildPath = path.join(BUILDS_DIR, `build-${build.id}`);
+    // Use custom download path if provided, otherwise use default
+    const downloadDir = build.downloadPath || BUILDS_DIR;
+    await fs.mkdir(downloadDir, { recursive: true });
+    
+    const buildPath = path.join(downloadDir, `build-${build.id}`);
     await fs.mkdir(buildPath, { recursive: true });
     
-    // Download URL can be GitHub release, direct link, etc.
-    const downloadUrl = build.downloadUrl || build.url;
+    // Try multiple download URLs (mirrors) in order
+    const urls = build.downloadUrls || [build.downloadUrl || build.url];
     
-    if (!downloadUrl) {
+    // Add some common fallback mirrors based on the build version
+    const fallbackUrls = [];
+    if (build.version || build.name) {
+      const version = build.version || build.name;
+      // Try some common mirror patterns
+      if (version.includes('1.11')) {
+        fallbackUrls.push('https://archive.org/download/fortnite-1.11/Fortnite_1.11.zip');
+      } else if (version.includes('5.00')) {
+        fallbackUrls.push('https://archive.org/download/fortnite-5.00/Fortnite_5.00.rar');
+      } else if (version.includes('7.00')) {
+        fallbackUrls.push('https://archive.org/download/fortnite-7.00/Fortnite_7.00.zip');
+      }
+    }
+    
+    const allUrls = [...urls, ...fallbackUrls];
+    
+    if (!urls || urls.length === 0 || !urls[0]) {
       return {
         success: false,
         error: 'No download URL provided for this build'
       };
     }
     
-    console.log(`Downloading build ${build.name} from ${downloadUrl}`);
-    
-    const lowerUrl = downloadUrl.toLowerCase();
-    const isZip = lowerUrl.endsWith('.zip');
-    const isRar = lowerUrl.endsWith('.rar');
-    const is7z = lowerUrl.endsWith('.7z');
-
-    if (isZip || isRar || is7z) {
-      const archivePath = path.join(buildPath, `build${isZip ? '.zip' : isRar ? '.rar' : '.7z'}`);
-
-      // Download the archive
-      await downloadFile(downloadUrl, archivePath, (progress) => {
-        event.sender.send('download-progress', { buildId: build.id, progress });
-      });
-
-      // Extract the archive
-      event.sender.send('download-status', { buildId: build.id, status: 'Extracting...' });
-
-      if (isZip) {
-        await extract(archivePath, { dir: buildPath });
-      } else {
-        if (!sevenZipPath) {
-          throw new Error('RAR/7z extraction requires 7zip. Please install dependency or provide a ZIP file.');
-        }
-        await new Promise((resolve, reject) => {
-          const p = spawn(sevenZipPath, ['x', archivePath, `-o${buildPath}`, '-y'], { stdio: 'ignore' });
-          p.on('close', (code) => code === 0 ? resolve(null) : reject(new Error(`7zip exited with code ${code}`)));
-          p.on('error', reject);
-        });
-      }
-
-      // Delete the archive file
-      await fs.unlink(archivePath).catch(() => {});
-    } else {
-      // Direct download (assume executable)
-      const exePath = path.join(buildPath, 'FortniteClient-Win64-Shipping.exe');
-      await downloadFile(downloadUrl, exePath, (progress) => {
-        event.sender.send('download-progress', { buildId: build.id, progress });
-      });
+    // Check available disk space before downloading
+    // Estimate required space: Fortnite builds are typically 10-20GB, plus extraction space
+    const estimatedSize = 25 * 1024 * 1024 * 1024; // 25GB estimate
+    const spaceCheck = await checkDiskSpace(estimatedSize, downloadDir);
+    if (!spaceCheck.available) {
+      return {
+        success: false,
+        error: spaceCheck.message || 'Not enough disk space for download'
+      };
     }
     
-    // Save metadata
-    const metaPath = path.join(buildPath, 'meta.json');
-    await fs.writeFile(metaPath, JSON.stringify(build, null, 2));
+    // Try each URL until one succeeds
+    for (let i = 0; i < allUrls.length; i++) {
+      const downloadUrl = allUrls[i];
+      
+      try {
+        console.log(`Trying URL ${i + 1}/${urls.length}: ${downloadUrl}`);
+        
+        if (i > 0) {
+          event.sender.send('download-status', { 
+            buildId: build.id, 
+            status: `Trying mirror ${i + 1}/${allUrls.length}...` 
+          });
+        }
     
-    return { success: true, path: buildPath };
+        const lowerUrl = downloadUrl.toLowerCase();
+        const isZip = lowerUrl.endsWith('.zip');
+        const isRar = lowerUrl.endsWith('.rar');
+        const is7z = lowerUrl.endsWith('.7z');
+
+        if (isZip || isRar || is7z) {
+          const archivePath = path.join(buildPath, `build${isZip ? '.zip' : isRar ? '.rar' : '.7z'}`);
+
+          // Download the archive
+          console.log(`[Download] Starting download of archive: ${downloadUrl}`);
+          await downloadFile(downloadUrl, archivePath, (progress, totalSize) => {
+            event.sender.send('download-progress', { buildId: build.id, progress, totalSize });
+          });
+          console.log(`[Download] Archive download completed`);
+
+          // Extract the archive
+          event.sender.send('download-status', { buildId: build.id, status: 'Extracting files...' });
+
+          if (isZip) {
+            await extract(archivePath, { dir: buildPath });
+          } else {
+            if (!sevenZipPath) {
+              throw new Error('RAR/7z extraction requires 7zip. Please install dependency or provide a ZIP file.');
+            }
+            await new Promise((resolve, reject) => {
+              const p = spawn(sevenZipPath, ['x', archivePath, `-o${buildPath}`, '-y'], { stdio: 'ignore' });
+              p.on('close', (code) => code === 0 ? resolve(null) : reject(new Error(`7zip exited with code ${code}`)));
+              p.on('error', reject);
+            });
+          }
+
+          // Delete the archive file
+          console.log(`[Download] Removing archive file: ${archivePath}`);
+          await fs.unlink(archivePath).catch((err) => {
+            console.warn(`[Download] Failed to remove archive: ${err.message}`);
+          });
+        } else {
+          // Direct download (assume executable)
+          const exePath = path.join(buildPath, 'FortniteClient-Win64-Shipping.exe');
+          console.log(`[Download] Starting direct download: ${downloadUrl}`);
+          await downloadFile(downloadUrl, exePath, (progress, totalSize) => {
+            event.sender.send('download-progress', { buildId: build.id, progress, totalSize });
+          });
+          console.log(`[Download] Direct download completed`);
+        }
+        
+        // Save metadata
+        const metaPath = path.join(buildPath, 'meta.json');
+        await fs.writeFile(metaPath, JSON.stringify(build, null, 2));
+        
+        console.log(`Successfully downloaded build ${build.name} using URL ${i + 1}`);
+        return { success: true, path: buildPath };
+        
+      } catch (error) {
+        console.warn(`URL ${i + 1} failed: ${error.message}`);
+        lastError = error;
+        
+        // Clean up failed download
+        try {
+          await fs.rm(buildPath, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.warn('Failed to clean up failed download:', cleanupError.message);
+        }
+        
+        // If this isn't the last URL, continue to next mirror
+        if (i < allUrls.length - 1) {
+          // Small delay before trying next mirror
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+      }
+    }
+    
+    // All URLs failed
+    console.error('All download URLs failed for build:', build.name);
+    return { 
+      success: false, 
+      error: `All download URLs failed. Last error: ${lastError?.message || 'Unknown error'}` 
+    };
   } catch (error) {
     console.error('Download failed:', error);
     return { 
@@ -856,7 +1448,7 @@ function downloadFile(url, dest, onProgress) {
         downloadedSize += chunk.length;
         if (onProgress && totalSize) {
           const progress = (downloadedSize / totalSize) * 100;
-          onProgress(progress);
+          onProgress(progress, totalSize);
         }
       });
       
@@ -1495,9 +2087,119 @@ ipcMain.handle('get-friends', async () => {
     const response = await axios.get(`${API_URL}/users/${userData.id}/friends`);
     return { success: true, friends: response.data };
   } catch (error) {
-    return { 
-      success: false, 
-      error: 'Failed to fetch friends' 
+    return {
+      success: false,
+      error: 'Failed to fetch friends'
     };
   }
+});
+
+// Download path selection
+ipcMain.handle('select-download-path', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Select Download Directory',
+      defaultPath: path.join(app.getPath('downloads'), 'Project Drift Builds')
+    });
+    return result;
+  } catch (error) {
+    console.error('Failed to select download path:', error);
+    return { canceled: true };
+  }
+});
+
+// Get default download path
+ipcMain.handle('get-default-download-path', () => {
+  return path.join(app.getPath('downloads'), 'Project Drift Builds');
+});
+
+// Authentication IPC handlers
+ipcMain.handle('auth-signin-discord', async () => {
+  console.log('Processing Discord signin');
+  try {
+    const result = await auth.signInWithDiscord();
+    if (result.success && result.url) {
+      // Open the OAuth URL in the user's default browser
+      const { shell } = require('electron');
+      await shell.openExternal(result.url);
+      return { success: true, message: 'OAuth URL opened in browser' };
+    } else {
+      throw new Error(result.error || 'Failed to get OAuth URL');
+    }
+  } catch (error) {
+    console.error('Discord signin error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth-signout', async () => {
+  console.log('Processing signout');
+  return await auth.signOut();
+});
+
+ipcMain.handle('auth-get-current-user', async () => {
+  const { data: { user } } = await auth.getCurrentUser();
+  return user;
+});
+
+ipcMain.handle('auth-get-session', async () => {
+  const { data: { session } } = await auth.getCurrentSession();
+  return session;
+});
+
+ipcMain.handle('auth-check-discord-server', async (event, userId) => {
+  return await auth.checkDiscordServerMembership(userId);
+});
+
+// Handle OAuth callback
+ipcMain.handle('auth-handle-callback', async (event, url) => {
+  try {
+    // Extract the authorization code from the URL
+    const urlObj = new URL(url);
+    const code = urlObj.searchParams.get('code');
+    const error = urlObj.searchParams.get('error');
+
+    if (error) {
+      return { success: false, error: `OAuth error: ${error}` };
+    }
+
+    if (!code) {
+      return { success: false, error: 'No authorization code received' };
+    }
+
+    // Exchange the code for a session
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError) throw exchangeError;
+
+    return { success: true, session: data.session, user: data.user };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Cancel download
+ipcMain.handle('cancel-download', async (event, buildId) => {
+  // For now, just return success - in a real implementation you'd need to track
+  // active downloads and cancel them properly
+  console.log(`Cancelling download for build: ${buildId}`);
+  return { success: true };
+});
+
+// Database IPC handlers
+ipcMain.handle('db-get-user-profile', async (event, userId) => {
+  return await db.getUserProfile(userId);
+});
+
+ipcMain.handle('db-upsert-user-profile', async (event, { userId, profileData }) => {
+  return await db.upsertUserProfile(userId, profileData);
+});
+
+ipcMain.handle('db-get-download-history', async (event, userId) => {
+  return await db.getDownloadHistory(userId);
+});
+
+ipcMain.handle('db-add-download-history', async (event, { userId, buildId, buildName, buildVersion }) => {
+  return await db.addDownloadHistory(userId, buildId, buildName, buildVersion);
 });

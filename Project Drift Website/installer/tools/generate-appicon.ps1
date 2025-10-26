@@ -57,8 +57,11 @@ $offset = $headerSize
 foreach ($entry in $pngBytesList) {
     $size = $entry.size
     $bytes = $entry.bytes
-    $bw.Write([byte]($size -bor 0))           # width (0 means 256)
-    $bw.Write([byte]($size -bor 0))           # height
+    # ICO stores 256 as 0 in width/height byte fields
+    $w = if ($size -eq 256) { 0 } else { $size }
+    $h = $w
+    $bw.Write([byte]$w)
+    $bw.Write([byte]$h)
     $bw.Write([byte]0)                        # color count
     $bw.Write([byte]0)                        # reserved
     $bw.Write([UInt16]0)                      # color planes (for PNG set to 0)

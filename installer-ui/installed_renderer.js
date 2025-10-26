@@ -1,5 +1,4 @@
 const { ipcRenderer } = require('electron');
-const { supabase } = require('../supabase');
 
 // State
 let currentUser = null;
@@ -8,7 +7,6 @@ let isOffline = false;
 let downloadPath = null; // Will be set when app is ready
 let authModal = null;
 let isAuthenticating = false;
-let isLoggedIn = false;
 
 // Helper function to format time
 function formatTime(seconds) {
@@ -28,232 +26,41 @@ function formatTime(seconds) {
 // Authentication functions
 async function checkAuthState() {
   try {
-    console.log('Checking auth state...');
     const session = await ipcRenderer.invoke('auth-get-session');
-    console.log('Auth state result:', { hasSession: !!session, hasUser: !!session?.user, userEmail: session?.user?.email });
-    
-    if (session && session.user) {
+    if (session) {
       currentUser = session.user;
-      isLoggedIn = true;
       updateAuthUI();
-      showMainApp();
       console.log('User authenticated:', currentUser.email);
     } else {
       currentUser = null;
-      isLoggedIn = false;
-      showLoginScreen();
-      console.log('No authenticated user found');
+      updateAuthUI();
     }
   } catch (error) {
     console.error('Failed to check auth state:', error);
-    showLoginScreen();
-  }
-}
-
-function showLoginScreen() {
-  console.log('Showing login screen');
-  const loginScreen = document.getElementById('login-screen');
-  const mainApp = document.getElementById('main-app');
-
-  if (loginScreen) {
-    loginScreen.style.display = 'flex';
-    console.log('Login screen displayed');
-  }
-  if (mainApp) {
-    mainApp.style.display = 'none';
-    console.log('Main app hidden');
-  }
-}
-
-function showMainApp() {
-  console.log('Showing main app');
-  const loginScreen = document.getElementById('login-screen');
-  const mainApp = document.getElementById('main-app');
-
-  if (loginScreen) {
-    loginScreen.style.display = 'none';
-    console.log('Login screen hidden');
-  }
-  if (mainApp) {
-    mainApp.style.display = 'flex';
-    console.log('Main app displayed');
   }
 }
 
 function updateAuthUI() {
   const userInfo = document.getElementById('user-info');
   const loginBtn = document.getElementById('login-btn');
-  const welcomeUsername = document.getElementById('welcome-username');
 
   if (currentUser) {
-    // Update user info with Discord data
-    const userAvatar = document.querySelector('.user-avatar');
-    const userName = document.querySelector('.user-name');
-    const userEmail = document.querySelector('.user-email');
-
-    // Use Discord avatar if available, otherwise fallback to default
-    let avatarUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM1ODY1RjIiLz4KPHBhdGggZD0iTTIwIDIwQzIyLjc2MTQgMjAgMjUgMTcuNzYxNCAyNSAxNUMyNSAxMi4yMzg2IDIyLjc2MTQgMTAgMjAgMTBDMTcuMjM4NiAxMCAxNSAxMi4yMzg2IDE1IDE1QzE1IDE3Ljc2MTQgMTcuMjM4NiAyMCAyMFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=';
-    
-    if (currentUser.user_metadata?.avatar_url) {
-      avatarUrl = currentUser.user_metadata.avatar_url;
-    } else if (currentUser.user_metadata?.provider_id && currentUser.user_metadata?.avatar) {
-      // Discord avatar format: https://cdn.discordapp.com/avatars/{user.id}/{user.avatar}.png
-      avatarUrl = `https://cdn.discordapp.com/avatars/${currentUser.user_metadata.provider_id}/${currentUser.user_metadata.avatar}.png`;
-    }
-    
-    if (userAvatar) {
-      userAvatar.style.backgroundImage = `url('${avatarUrl}')`;
-      userAvatar.style.backgroundSize = 'cover';
-      userAvatar.style.backgroundPosition = 'center';
-    }
-
-    if (userName) {
-      userName.textContent = currentUser.user_metadata?.full_name || 
-                           currentUser.user_metadata?.name || 
-                           currentUser.user_metadata?.preferred_username ||
-                           currentUser.user_metadata?.username || 
-                           'Discord User';
-    }
-
-    if (userEmail) {
-      userEmail.textContent = currentUser.email || '';
-    }
-
-    if (welcomeUsername) {
-      const displayName = currentUser.user_metadata?.full_name || 
-                         currentUser.user_metadata?.name || 
-                         currentUser.user_metadata?.preferred_username ||
-                         currentUser.user_metadata?.username || 
-                         'Player';
-      welcomeUsername.textContent = displayName;
-    }
-
+    userInfo.innerHTML = `
+      <div class="user-avatar">${currentUser.email.charAt(0).toUpperCase()}</div>
+      <div class="user-details">
+        <div class="user-name">${currentUser.user_metadata?.username || 'User'}</div>
+        <div class="user-email">${currentUser.email}</div>
+      </div>
+      <button id="logout-btn" class="logout-btn">Logout</button>
+    `;
     userInfo.style.display = 'flex';
     loginBtn.style.display = 'none';
 
     // Add logout handler
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', handleLogout);
-    }
+    document.getElementById('logout-btn').addEventListener('click', handleLogout);
   } else {
     userInfo.style.display = 'none';
     loginBtn.style.display = 'block';
-    
-    if (welcomeUsername) {
-      welcomeUsername.textContent = 'Player';
-    }
-  }
-}
-
-// Utility function to show notifications
-function showNotification(message, type = 'info') {
-  // Create notification element
-  const notification = document.createElement('div');
-  notification.className = `notification notification-${type}`;
-  notification.innerHTML = `
-    <div class="notification-content">
-      <span>${message}</span>
-      <button class="notification-close">&times;</button>
-    </div>
-  `;
-
-  // Add to body
-  document.body.appendChild(notification);
-
-  // Add close handler
-  const closeBtn = notification.querySelector('.notification-close');
-  closeBtn.addEventListener('click', () => {
-    notification.remove();
-  });
-
-  // Auto remove after 5 seconds
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, 5000);
-}
-
-async function handleDiscordLogin() {
-  try {
-    console.log('Starting Discord login process...');
-    const discordLoginBtn = document.getElementById('discord-login-btn');
-    const originalText = discordLoginBtn.innerHTML;
-    
-    // Show loading state
-    discordLoginBtn.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" class="animate-spin">
-        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"/>
-      </svg>
-      Opening Discord...
-    `;
-    discordLoginBtn.disabled = true;
-
-    console.log('Invoking auth-signin-discord IPC...');
-    // Call Discord authentication - this will open the OAuth URL in browser
-    const result = await ipcRenderer.invoke('auth-signin-discord');
-    console.log('Discord login IPC result:', result);
-    
-    if (result.success) {
-      console.log('Discord OAuth URL opened successfully');
-      // OAuth URL opened successfully
-      discordLoginBtn.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-        </svg>
-        Check your browser
-      `;
-      
-      showNotification('Discord authorization page opened in your browser. Please complete the sign-in there.', 'info');
-      
-      // Reset button after 3 seconds
-      setTimeout(() => {
-        discordLoginBtn.innerHTML = `
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419-.0189 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
-          </svg>
-          Sign in with Discord
-        `;
-        discordLoginBtn.disabled = false;
-      }, 3000);
-    } else {
-      console.error('Failed to open Discord OAuth URL:', result.error);
-      throw new Error(result.error || 'Failed to open Discord authorization');
-    }
-  } catch (error) {
-    console.error('Discord login failed:', error);
-    
-    // Reset button
-    const discordLoginBtn = document.getElementById('discord-login-btn');
-    discordLoginBtn.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419-.0189 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
-      </svg>
-      Sign in with Discord
-    `;
-    discordLoginBtn.disabled = false;
-
-    // Show error notification
-    showNotification('Failed to open Discord authorization. Please try again.', 'error');
-  }
-}
-
-async function handleLogout() {
-  try {
-    const result = await ipcRenderer.invoke('auth-signout');
-    if (result.success) {
-      currentUser = null;
-      isLoggedIn = false;
-      updateAuthUI();
-      showLoginScreen();
-      showNotification('Successfully logged out.', 'success');
-    } else {
-      throw new Error(result.error || 'Logout failed');
-    }
-  } catch (error) {
-    console.error('Logout failed:', error);
-    showNotification('Failed to log out. Please try again.', 'error');
   }
 }
 
@@ -494,23 +301,6 @@ document.getElementById('save-download-settings').addEventListener('click', () =
   downloadPath = document.getElementById('download-path').value;
   // Save to settings (could be implemented later)
   document.getElementById('download-settings-modal').classList.remove('show');
-});
-
-// Import build button
-document.getElementById('import-build-btn').addEventListener('click', async () => {
-  try {
-    const result = await ipcRenderer.invoke('import-build');
-    
-    if (result.success) {
-      showNotification('Build imported successfully!', 'success');
-      loadBuilds(); // Refresh the library
-    } else {
-      showNotification('Import failed: ' + result.error, 'error');
-    }
-  } catch (error) {
-    console.error('Import failed:', error);
-    showNotification('Import failed: ' + error.message, 'error');
-  }
 });
 
 // Initialize - connect to REAL backend
@@ -1894,73 +1684,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if (loginBtn) {
     loginBtn.addEventListener('click', () => showAuthModal('signin'));
   }
-
-  // Add Discord login handler
-  const discordLoginBtn = document.getElementById('discord-login-btn');
-  if (discordLoginBtn) {
-    discordLoginBtn.addEventListener('click', handleDiscordLogin);
-  }
-
-  // Listen for OAuth success from main process
-  ipcRenderer.on('oauth-success', async () => {
-    console.log('OAuth successful, checking auth state...');
-    try {
-      // Check authentication state after successful OAuth
-      await checkAuthState();
-      showNotification('Successfully signed in with Discord!', 'success');
-    } catch (error) {
-      console.error('Error after OAuth success:', error);
-      showNotification('Authentication failed. Please try again.', 'error');
-    }
-  });
-
-  // Listen for OAuth callback from main process (fallback)
-  ipcRenderer.on('oauth-callback', async (event, callbackData) => {
-    console.log('Received OAuth callback (fallback):', callbackData);
-    try {
-      if (callbackData.access_token) {
-        // We received the access token directly, set the session manually
-        const { data, error } = await supabase.auth.setSession({
-          access_token: callbackData.access_token,
-          refresh_token: callbackData.refresh_token
-        });
-
-        if (error) throw error;
-
-        console.log('Session set successfully, checking auth state...');
-        // Check authentication state again after successful OAuth
-        await checkAuthState();
-        
-        showNotification('Successfully signed in with Discord!', 'success');
-      } else {
-        // Fallback to the old method if we get a URL
-        const result = await ipcRenderer.invoke('auth-handle-callback', callbackData);
-        
-        if (result.success) {
-          console.log('OAuth successful, checking auth state...');
-          // Check authentication state again after successful OAuth
-          await checkAuthState();
-        } else {
-          console.error('OAuth failed:', result.error);
-          showNotification('Authentication failed: ' + result.error, 'error');
-        }
-      }
-    } catch (error) {
-      console.error('Error processing OAuth callback:', error);
-      showNotification('Authentication failed. Please try again.', 'error');
-    }
-  });
-
-  // Listen for OAuth errors from main process
-  ipcRenderer.on('oauth-error', (event, errorData) => {
-    console.log('Received OAuth error:', errorData);
-    showNotification(`Discord authentication failed: ${errorData.error_description || errorData.error}`, 'error');
-  });
-
-  // Check auth state when window regains focus (user returns from browser)
-  window.addEventListener('focus', async () => {
-    console.log('Window focused, checking auth state...');
-    await checkAuthState();
-  });
 });
 

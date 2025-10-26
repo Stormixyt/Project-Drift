@@ -1,0 +1,186 @@
+body {
+  background: #000;
+  font-family: 'Inter', sans-serif;
+  color: #fff;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.particle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  background: #00D9FF;
+  border-radius: 50%;
+  opacity: 0.3;
+  animation: float 15s linear infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.3; }
+  90% { opacity: 0.3; }
+  100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+}
+
+.installer-container {
+  background: rgba(15, 15, 15, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  padding: 40px 50px;
+  width: 500px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.installer-container:hover {
+  box-shadow: 0 12px 48px rgba(0, 217, 255, 0.1);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+.installer-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.installer-logo:hover {
+  transform: scale(1.05);
+}
+
+h1 {
+  font-size: 2.2em;
+  font-weight: 700;
+  color: #00D9FF;
+  margin: 0;
+  text-align: center;
+}
+
+.desc {
+  color: #ccc;
+  font-size: 1em;
+  text-align: center;
+  margin: 12px 0 24px;
+  line-height: 1.6;
+  max-width: 400px;
+}
+
+.btn-primary {
+  background: #00D9FF;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1em;
+  font-weight: 600;
+  padding: 12px 32px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  background: #00b8e6;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.progress-container {
+  width: 100%;
+  margin: 20px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #00D9FF;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  color: #00D9FF;
+  font-size: 0.9em;
+  margin-top: 8px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.run-label {
+  font-size: 0.9em;
+  color: #ccc;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.run-label input {
+  accent-color: #00D9FF;
+}
+
+.success-icon {
+  font-size: 3em;
+  color: #00D9FF;
+  margin-bottom: 12px;
+}
+
+.footer {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 24px;
+  text-align: center;
+}

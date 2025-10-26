@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Drift Installer</title>
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,500,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+  <div class="installer-container">
+    <div class="step" id="welcome-step">
+      <img src="../Project Drift Website/installer/InstallerImage.png" class="installer-logo" alt="Project Drift Logo">
+      <h1>Project Drift</h1>
+      <p class="desc">The ultimate nostalgia experience for Fortnite fans. This installer will set up everything you need to relive the golden era of Fortnite.</p>
+      <button id="next-btn" class="btn-primary">Get Started</button>
+    </div>
+    <div class="step hidden" id="install-step">
+      <h1>Installing Project Drift</h1>
+      <p class="desc">Please wait while we install the launcher and all required dependencies...</p>
+      <div class="progress-container">
+        <div class="progress-bar" id="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-text" id="progress-text">Preparing installation...</div>
+      </div>
+      <label class="run-label"><input type="checkbox" id="run-launcher" checked> Launch Project Drift after installation</label>
+      <label class="run-label"><input type="checkbox" id="run-with-terminal"> Run with terminal (for debugging)</label>
+    </div>
+    <div class="step hidden" id="complete-step">
+      <div class="success-icon">✓</div>
+      <h1>Installation Complete!</h1>
+      <p class="desc">Project Drift has been successfully installed with all dependencies. Shortcuts have been created on your desktop and start menu.</p>
+      <button id="finish-btn" class="btn-primary">Launch Project Drift</button>
+    </div>
+    <div class="footer">&copy; 2025 Project Drift</div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    let currentStep = 0;
+    const steps = ['welcome-step', 'install-step', 'complete-step'];
+
+    function showStep(stepIndex) {
+      steps.forEach((id, index) => {
+        document.getElementById(id).classList.toggle('hidden', index !== stepIndex);
+      });
+      currentStep = stepIndex;
+    }
+
+    document.getElementById('next-btn').onclick = () => {
+      showStep(1);
+      const runAfter = document.getElementById('run-launcher').checked;
+      const withTerminal = document.getElementById('run-with-terminal').checked;
+      ipcRenderer.send('install', runAfter, withTerminal);
+    };
+
+    document.getElementById('finish-btn').onclick = () => {
+      ipcRenderer.send('launch-app');
+      ipcRenderer.send('close-app');
+    };
+
+    ipcRenderer.on('install-progress', (event, progress, text) => {
+      document.getElementById('progress-fill').style.width = progress + '%';
+      document.getElementById('progress-text').textContent = text;
+    });
+
+    ipcRenderer.on('install-progress', (event, progress, text) => {
+      document.getElementById('progress-fill').style.width = progress + '%';
+      document.getElementById('progress-text').textContent = text;
+    });
+
+    ipcRenderer.on('install-complete', () => {
+      showStep(2);
+    });
+
+    ipcRenderer.on('install-error', (event, error) => {
+      alert('Installation failed: ' + error);
+      showStep(0);
+    });
+
+    // Particle effect
+    const particlesContainer = document.getElementById('particles');
+    for (let i = 0; i < 50; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'particle';
+      particle.style.left = Math.random() * 100 + '%';
+      particle.style.animationDelay = Math.random() * 10 + 's';
+      particlesContainer.appendChild(particle);
+    }
+  </script>
+</body>
+</html>
