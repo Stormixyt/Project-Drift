@@ -133,13 +133,28 @@ function downloadLauncher(progressCallback) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
 
-      const zipPath = 'C:\\Users\\Stormix\\Downloads\\Project Drift\\launcher\\dist\\Project-Drift-Launcher-v1.0.0.zip';
+      // Prefer the bundled zip (next to the installer); fall back to a configured local path or remote URL
+      let zipSourcePath = null;
+      if (fs.existsSync(BUNDLED_ZIP_PATH)) {
+        zipSourcePath = BUNDLED_ZIP_PATH;
+        console.log('Using bundled launcher zip from installer resources');
+      } else if (fs.existsSync(LAUNCHER_ZIP_URL.replace('file://', ''))) {
+        zipSourcePath = LAUNCHER_ZIP_URL.replace('file://', '');
+        console.log('Using configured local launcher zip path');
+      }
 
-      console.log('Using local launcher zip...');
-
-      // Copy the local zip to temp location for extraction
       const tempZipPath = path.join(tempDir, 'launcher.zip');
-      fs.copyFileSync(zipPath, tempZipPath);
+
+      if (zipSourcePath) {
+        // Copy the local zip to temp location for extraction
+        fs.copyFileSync(zipSourcePath, tempZipPath);
+      } else {
+        // No local zip available - try downloading from remote URL
+        console.log('No bundled/local zip found; attempting to download from remote URL');
+        await downloadFile(LAUNCHER_DOWNLOAD_URL, tempZipPath, (p) => {
+          if (progressCallback) progressCallback(Math.round(p * 0.6));
+        });
+      }
 
       console.log('Copy complete, extracting...');
 
@@ -154,7 +169,8 @@ function downloadLauncher(progressCallback) {
       // Clean up temp file
       try {
         fs.unlinkSync(tempZipPath);
-        fs.rmdirSync(extractTempDir);
+        // remove temp directory if empty
+        try { fs.rmdirSync(tempDir); } catch (e) { /* ignore */ }
       } catch (error) {
         console.warn('Could not clean up temp file:', error.message);
       }
@@ -173,6 +189,38 @@ function downloadLauncher(progressCallback) {
       }
 
       console.log('Launcher downloaded and extracted successfully');
+      // Copy bundled ffmpeg.dll if present next to the installer into the install directory
+      try {
+        const bundledFfmpeg = path.join(__dirname, 'ffmpeg.dll');
+        if (fs.existsSync(bundledFfmpeg)) {
+          // copy to install root
+          const destRoot = path.join(installDir, 'ffmpeg.dll');
+          fs.copyFileSync(bundledFfmpeg, destRoot);
+          console.log('Copied bundled ffmpeg.dll to', destRoot);
+
+          // also copy to resources and resources/app if those paths exist
+          const resourcesDir = path.join(installDir, 'resources');
+          const resourcesAppDir = path.join(resourcesDir, 'app');
+          try {
+            if (fs.existsSync(resourcesDir)) {
+              const destRes = path.join(resourcesDir, 'ffmpeg.dll');
+              fs.copyFileSync(bundledFfmpeg, destRes);
+              console.log('Copied ffmpeg.dll to', destRes);
+            }
+            if (fs.existsSync(resourcesAppDir)) {
+              const destResApp = path.join(resourcesAppDir, 'ffmpeg.dll');
+              fs.copyFileSync(bundledFfmpeg, destResApp);
+              console.log('Copied ffmpeg.dll to', destResApp);
+            }
+          } catch (err) {
+            console.warn('Failed to copy ffmpeg to resources:', err.message);
+          }
+        } else {
+          console.log('No bundled ffmpeg.dll found next to installer');
+        }
+      } catch (err) {
+        console.warn('Error while handling bundled ffmpeg:', err.message);
+      }
       if (progressCallback) progressCallback(100);
       resolve();
 

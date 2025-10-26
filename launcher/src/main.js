@@ -244,6 +244,16 @@ function startCallbackServer() {
             const sessionResult = await auth.setSession(tokens.access_token, tokens.refresh_token);
 
             if (sessionResult.success) {
+                  // Persist tokens so session can be restored after restart
+                  try {
+                    await saveAuthTokens({
+                      access_token: tokens.access_token,
+                      refresh_token: tokens.refresh_token,
+                      expires_at: tokens.expires_at
+                    });
+                  } catch (err) {
+                    console.warn('Failed to persist auth tokens:', err.message);
+                  }
               console.log('Session set successfully in main process');
 
               // Verify the session was set by checking it immediately
@@ -338,6 +348,37 @@ function startCallbackServer() {
   });
 }
 
+// Persist auth tokens to disk so session survives restarts
+const AUTH_STORE_PATH = path.join(app.getPath ? app.getPath('userData') : __dirname, 'auth.json');
+
+async function saveAuthTokens(tokens) {
+  try {
+    const toSave = {
+      access_token: tokens.access_token || null,
+      refresh_token: tokens.refresh_token || null,
+      expires_at: tokens.expires_at || null
+    };
+    await fs.writeFile(AUTH_STORE_PATH, JSON.stringify(toSave, null, 2), { encoding: 'utf8' });
+    console.log('Saved auth tokens to', AUTH_STORE_PATH);
+  } catch (err) {
+    console.warn('Failed to save auth tokens:', err.message);
+  }
+}
+
+async function loadAuthTokens() {
+  try {
+    if (fsSync.existsSync(AUTH_STORE_PATH)) {
+      const raw = await fs.readFile(AUTH_STORE_PATH, { encoding: 'utf8' });
+      const parsed = JSON.parse(raw);
+      console.log('Loaded saved auth tokens');
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('Failed to load auth tokens:', err.message);
+  }
+  return null;
+}
+
 // Stop the callback server
 function stopCallbackServer() {
   if (callbackServer) {
@@ -363,6 +404,24 @@ app.whenReady().then(() => {
 
   // Create the main window
   createMainWindow();
+});
+
+// After app ready, attempt to rehydrate saved session (if any)
+app.whenReady().then(async () => {
+  try {
+    const tokens = await loadAuthTokens();
+    if (tokens && tokens.access_token) {
+      console.log('Rehydrating saved auth session');
+      const setResult = await auth.setSession(tokens.access_token, tokens.refresh_token);
+      if (setResult && setResult.success) {
+        console.log('Session rehydrated successfully from disk');
+      } else {
+        console.warn('Failed to rehydrate session:', setResult && setResult.error);
+      }
+    }
+  } catch (err) {
+    console.warn('Error during session rehydration:', err.message);
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -2135,7 +2194,16 @@ ipcMain.handle('auth-signin-discord', async () => {
 
 ipcMain.handle('auth-signout', async () => {
   console.log('Processing signout');
-  return await auth.signOut();
+  const result = await auth.signOut();
+  if (result && result.success) {
+    try {
+      if (fsSync.existsSync(AUTH_STORE_PATH)) fsSync.unlinkSync(AUTH_STORE_PATH);
+      console.log('Removed persisted auth tokens');
+    } catch (err) {
+      console.warn('Failed to remove persisted auth tokens:', err.message);
+    }
+  }
+  return result;
 });
 
 ipcMain.handle('auth-get-current-user', async () => {
