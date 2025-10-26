@@ -48,19 +48,30 @@ $smallPngPath = Join-Path $installerAssetsDir "InstallerSmall.png"
 $bmpOut = Join-Path $staging "InstallerImage.bmp"
 $smallBmpOut = Join-Path $staging "InstallerSmall.bmp"
 $icoOut = Join-Path $staging "AppIcon.ico"
+# Also write copies into the installer script folder so ISCC (which runs with
+# the script folder as current working directory) can find them via the names
+# used in installer.iss (e.g. "InstallerImage.bmp").
+$bmpOutScript = Join-Path $scriptRoot "InstallerImage.bmp"
+$smallBmpOutScript = Join-Path $scriptRoot "InstallerSmall.bmp"
+$icoOutScript = Join-Path $scriptRoot "AppIcon.ico"
 
 if (Test-Path $pngPath) {
     Write-Host "Converting InstallerImage.png -> BMP and ICO"
     Add-Type -AssemblyName System.Drawing
     $img = [System.Drawing.Image]::FromFile($pngPath)
-    # Save main BMP
+    # Save main BMP (to staging and to script folder)
     $img.Save($bmpOut, [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $img.Save($bmpOutScript, [System.Drawing.Imaging.ImageFormat]::Bmp)
     # Create ICO from the image
     $bmp = New-Object System.Drawing.Bitmap $img
     $icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
     $fs = [System.IO.File]::Open($icoOut, [System.IO.FileMode]::Create)
     $icon.Save($fs)
     $fs.Close()
+    # also save ICO into script folder so installer.iss can reference it
+    $fs2 = [System.IO.File]::Open($icoOutScript, [System.IO.FileMode]::Create)
+    $icon.Save($fs2)
+    $fs2.Close()
     $icon.Dispose()
     $bmp.Dispose()
     $img.Dispose()
@@ -70,7 +81,9 @@ if (Test-Path $smallPngPath) {
     Write-Host "Converting InstallerSmall.png -> BMP"
     Add-Type -AssemblyName System.Drawing
     $img2 = [System.Drawing.Image]::FromFile($smallPngPath)
+    # Save small BMP to staging and script folder
     $img2.Save($smallBmpOut, [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $img2.Save($smallBmpOutScript, [System.Drawing.Imaging.ImageFormat]::Bmp)
     $img2.Dispose()
 } elseif (Test-Path $pngPath) {
     # create a smaller BMP from main image
@@ -78,6 +91,7 @@ if (Test-Path $smallPngPath) {
     $img = [System.Drawing.Image]::FromFile($pngPath)
     $small = New-Object System.Drawing.Bitmap $img, ([int]($img.Width/4)), ([int]($img.Height/4))
     $small.Save($smallBmpOut, [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $small.Save($smallBmpOutScript, [System.Drawing.Imaging.ImageFormat]::Bmp)
     $small.Dispose()
     $img.Dispose()
 }
@@ -86,6 +100,7 @@ if (Test-Path $smallPngPath) {
 $providedIco = Join-Path $installerAssetsDir "AppIcon.ico"
 if (Test-Path $providedIco) {
     Copy-Item -Path $providedIco -Destination $icoOut -Force
+    Copy-Item -Path $providedIco -Destination $icoOutScript -Force
 }
 
 # Locate ISCC.exe (Inno Setup compiler)
