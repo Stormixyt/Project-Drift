@@ -858,23 +858,40 @@
             const launcherLink = document.getElementById('download-launcher-zip');
             const staticInstallerHref = installerBtn ? installerBtn.href : '#';
 
+            // prefer this exact zip name in releases
+            const preferredInstallerZip = 'project.drift.installer.zip';
+
             try {
                 const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
                 if (!res.ok) throw new Error('GitHub API returned ' + res.status);
                 const data = await res.json();
                 const assets = data.assets || [];
 
-                const installerAsset = assets.find(a => /installer/i.test(a.name) && a.name.toLowerCase().endsWith('.exe'));
-                const launcherAsset = assets.find(a => /launcher/i.test(a.name) && a.name.toLowerCase().endsWith('.zip'));
+                // First try to find the preferred release zip by exact name (case-insensitive)
+                const preferredZipAsset = assets.find(a => a.name && a.name.toLowerCase() === preferredInstallerZip);
 
-                if (installerAsset && installerBtn) {
-                    installerBtn.href = installerAsset.browser_download_url;
-                    installerBtn.setAttribute('data-latest', installerAsset.name);
-                } else if (installerBtn) {
-                    // keep existing static link
-                    installerBtn.href = staticInstallerHref;
+                if (preferredZipAsset && installerBtn) {
+                    installerBtn.href = preferredZipAsset.browser_download_url;
+                    installerBtn.setAttribute('data-latest', preferredZipAsset.name);
+                } else {
+                    // fall back to older heuristics: exe installer or any zip that contains "installer"
+                    const exeInstaller = assets.find(a => /installer/i.test(a.name) && a.name.toLowerCase().endsWith('.exe'));
+                    const anyInstallerZip = assets.find(a => /installer/i.test(a.name) && a.name.toLowerCase().endsWith('.zip'));
+
+                    if (anyInstallerZip && installerBtn) {
+                        installerBtn.href = anyInstallerZip.browser_download_url;
+                        installerBtn.setAttribute('data-latest', anyInstallerZip.name);
+                    } else if (exeInstaller && installerBtn) {
+                        installerBtn.href = exeInstaller.browser_download_url;
+                        installerBtn.setAttribute('data-latest', exeInstaller.name);
+                    } else if (installerBtn) {
+                        // keep existing static link
+                        installerBtn.href = staticInstallerHref;
+                    }
                 }
 
+                // launcher zip asset -- keep previous behavior (search for launcher zip)
+                const launcherAsset = assets.find(a => /launcher/i.test(a.name) && a.name.toLowerCase().endsWith('.zip'));
                 if (launcherAsset && launcherLink) {
                     launcherLink.href = launcherAsset.browser_download_url;
                     launcherLink.style.display = 'block';
