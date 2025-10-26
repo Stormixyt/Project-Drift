@@ -34,10 +34,27 @@ Get-ChildItem -Path $siteRoot -Force | Where-Object { $_.Name -ne 'installer' -a
 # If the launcher was built by CI, copy the produced EXE into staging and normalize the name
 $launcherDist = Join-Path $scriptRoot "..\launcher\dist"
 if (Test-Path $launcherDist) {
-    $exe = Get-ChildItem -Path $launcherDist -Filter *.exe -Recurse -File | Select-Object -First 1
+    Write-Host "Looking for built launcher executables under: $launcherDist"
+    # Prefer a predictable name produced by electron-builder (ProjectDriftLauncher.exe), then product-named artifacts,
+    # then any exe in win-unpacked or the dist root.
+    $candidates = @()
+    $candidates += Get-ChildItem -Path $launcherDist -Filter 'ProjectDriftLauncher.exe' -Recurse -File -ErrorAction SilentlyContinue
+    if (-not $candidates) {
+        $candidates += Get-ChildItem -Path $launcherDist -Filter 'Project*.*.exe' -Recurse -File -ErrorAction SilentlyContinue
+    }
+    if (-not $candidates) {
+        $candidates += Get-ChildItem -Path (Join-Path $launcherDist 'win-unpacked') -Filter *.exe -File -ErrorAction SilentlyContinue
+    }
+    if (-not $candidates) {
+        $candidates += Get-ChildItem -Path $launcherDist -Filter *.exe -File -Recurse -ErrorAction SilentlyContinue
+    }
+
+    $exe = $candidates | Select-Object -First 1
     if ($exe) {
         Write-Host "Found launcher exe: $($exe.FullName). Copying into staging as ProjectDriftLauncher.exe"
         Copy-Item -Path $exe.FullName -Destination (Join-Path $staging "ProjectDriftLauncher.exe") -Force
+    } else {
+        Write-Host "No launcher exe found under $launcherDist. Installer will not include a launcher executable."
     }
 }
 
@@ -100,7 +117,27 @@ if (Test-Path $smallPngPath) {
 $providedIco = Join-Path $installerAssetsDir "AppIcon.ico"
 if (Test-Path $providedIco) {
     Copy-Item -Path $providedIco -Destination $icoOut -Force
-    Copy-Item -Path $providedIco -Destination $icoOutScript -Force
+    # Only copy into the script folder if the source and destination are not the same file
+    try {
+        $providedFull = (Get-Item -LiteralPath $providedIco).FullName
+    } catch {
+        $providedFull = $null
+    }
+
+    if ($providedFull) {
+        if (-not (Test-Path $icoOutScript)) {
+            Copy-Item -Path $providedIco -Destination $icoOutScript -Force
+        } else {
+            try {
+                $destFull = (Get-Item -LiteralPath $icoOutScript).FullName
+            } catch {
+                $destFull = $null
+            }
+            if ($destFull -and ($destFull -ne $providedFull)) {
+                Copy-Item -Path $providedIco -Destination $icoOutScript -Force
+            }
+        }
+    }
 }
 
 # Locate ISCC.exe (Inno Setup compiler)

@@ -30,6 +30,7 @@
   "build": {
     "appId": "com.projectdrift.launcher",
     "productName": "Project Drift",
+    "artifactName": "ProjectDriftLauncher.exe",
     "directories": {
       "output": "dist"
     },
@@ -59,6 +60,7 @@
       }
     ],
     "win": {
+      "icon": "../Project Drift Website/installer/AppIcon.ico",
       "target": [
         {
           "target": "portable",
