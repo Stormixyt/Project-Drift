@@ -60,7 +60,6 @@
       }
     ],
     "win": {
-      "icon": "../Project Drift Website/installer/AppIcon.ico",
       "target": [
         {
           "target": "portable",
