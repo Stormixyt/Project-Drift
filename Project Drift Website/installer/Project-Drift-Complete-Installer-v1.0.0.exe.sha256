@@ -1,0 +1,4 @@
+FE55D5AB616B57AB58492C328E061A872CA54FAAB805A61A20EB5886148E760A  Project-Drift-Complete-Installer-v1.0.0.exe
+
+# Generated locally on 2025-10-26 by build run in repository workspace.
+# Use this to verify the downloaded release installer: sha256sum -c <filename>.sha256  (or manual compare)
