@@ -189,6 +189,90 @@ function downloadLauncher(progressCallback) {
       }
 
       console.log('Launcher downloaded and extracted successfully');
+      // Ensure ICU data and locales are present for Electron (fix: Invalid file descriptor to ICU data)
+      try {
+        // Search for icudtl.dat inside the extracted tree
+        function findFileRecursive(startPath, fileName) {
+          const queue = [startPath];
+          while (queue.length) {
+            const cur = queue.shift();
+            try {
+              const entries = fs.readdirSync(cur, { withFileTypes: true });
+              for (const e of entries) {
+                const full = path.join(cur, e.name);
+                if (e.isFile() && e.name.toLowerCase() === fileName.toLowerCase()) return full;
+                if (e.isDirectory()) queue.push(full);
+              }
+            } catch (err) {
+              // ignore permission errors
+            }
+          }
+          return null;
+        }
+
+        const icuPath = findFileRecursive(installDir, 'icudtl.dat');
+        if (icuPath) {
+          // Copy icudtl.dat next to the main exe and into resources if needed
+          const exeDest = path.join(installDir, 'icudtl.dat');
+          try { fs.copyFileSync(icuPath, exeDest); console.log('Copied icudtl.dat to', exeDest); } catch (e) { console.warn('Failed to copy icudtl.dat to exe root:', e.message); }
+
+          const resourcesDir = path.join(installDir, 'resources');
+          try {
+            if (fs.existsSync(resourcesDir)) {
+              const destRes = path.join(resourcesDir, 'icudtl.dat');
+              fs.copyFileSync(icuPath, destRes);
+              console.log('Copied icudtl.dat to', destRes);
+            }
+          } catch (e) {
+            console.warn('Failed to copy icudtl.dat to resources:', e.message);
+          }
+        } else {
+          console.log('icudtl.dat not found inside extracted launcher; if error persists, bundle icudtl.dat with the installer');
+        }
+
+        // Copy locales directory if exists
+        function findDirRecursive(startPath, dirName) {
+          const queue = [startPath];
+          while (queue.length) {
+            const cur = queue.shift();
+            try {
+              const entries = fs.readdirSync(cur, { withFileTypes: true });
+              for (const e of entries) {
+                const full = path.join(cur, e.name);
+                if (e.isDirectory() && e.name.toLowerCase() === dirName.toLowerCase()) return full;
+                if (e.isDirectory()) queue.push(full);
+              }
+            } catch (err) {
+              // ignore
+            }
+          }
+          return null;
+        }
+
+        const localesSrc = findDirRecursive(installDir, 'locales');
+        if (localesSrc) {
+          const localesDest = path.join(installDir, 'locales');
+          try {
+            // copy recursively
+            const copyRecursive = (src, dst) => {
+              if (!fs.existsSync(dst)) fs.mkdirSync(dst, { recursive: true });
+              const items = fs.readdirSync(src, { withFileTypes: true });
+              for (const item of items) {
+                const s = path.join(src, item.name);
+                const d = path.join(dst, item.name);
+                if (item.isDirectory()) copyRecursive(s, d);
+                else fs.copyFileSync(s, d);
+              }
+            };
+            copyRecursive(localesSrc, localesDest);
+            console.log('Copied locales to', localesDest);
+          } catch (e) {
+            console.warn('Failed to copy locales folder:', e.message);
+          }
+        }
+      } catch (err) {
+        console.warn('Error while ensuring ICU/locales files:', err.message);
+      }
       // Copy bundled ffmpeg.dll if present next to the installer into the install directory
       try {
         const bundledFfmpeg = path.join(__dirname, 'ffmpeg.dll');
