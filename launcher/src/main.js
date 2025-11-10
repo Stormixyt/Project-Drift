@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const Store = require('electron-store');
 const path = require('path');
 const axios = require('axios');
 const { spawn, exec, execSync } = require('child_process');
@@ -9,7 +10,9 @@ const { pipeline } = require('stream/promises');
 const extract = require('extract-zip');
 const util = require('util');
 const execPromise = util.promisify(exec);
-const { auth, db } = require('./supabase');
+
+// Initialize persistent store for session management
+const store = new Store();
 
 let sevenZipPath = null;
 try {
@@ -17,578 +20,6 @@ try {
   sevenZipPath = require('7zip-bin').path7za || null;
 } catch (_) {
   // optional dependency
-}
-
-// Local HTTP server for OAuth callback handling
-const http = require('http');
-let callbackServer = null;
-
-// Start local HTTP server for OAuth callbacks
-function startCallbackServer() {
-  if (callbackServer) return;
-
-  callbackServer = http.createServer(async (req, res) => {
-    console.log('Received callback request:', req.url);
-    
-    // Check if this is an OAuth error
-    const url = new URL(req.url, `http://localhost:3001`);
-    const error = url.searchParams.get('error');
-    const errorCode = url.searchParams.get('error_code');
-    const errorDescription = url.searchParams.get('error_description');
-    
-    // Also check for errors in hash fragment
-    const hash = url.hash.substring(1);
-    const hashParams = new URLSearchParams(hash);
-    const hashError = hashParams.get('error');
-    const hashErrorCode = hashParams.get('error_code');
-    const hashErrorDescription = hashParams.get('error_description');
-    
-    const finalError = error || hashError;
-    const finalErrorCode = errorCode || hashErrorCode;
-    const finalErrorDescription = errorDescription || hashErrorDescription;
-    
-    if (finalError) {
-      console.log('OAuth error received:', { error: finalError, errorCode: finalErrorCode, errorDescription: finalErrorDescription });
-      
-      // Send error to renderer process
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('oauth-error', {
-          error: finalError,
-          errorCode: finalErrorCode,
-          errorDescription: finalErrorDescription
-        });
-      }
-      
-      res.writeHead(400, { 'Content-Type': 'text/html' });
-      res.end(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Authentication Failed</title>
-          <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #0b0c0f; color: #e6e6e6; }
-            .error { color: #ff4444; font-size: 24px; margin: 20px 0; }
-            .details { font-size: 14px; color: #aaa; margin: 20px 0; }
-          </style>
-        </head>
-        <body>
-          <h1 class="error">✗ Authentication Failed</h1>
-          <p class="details">Error: ${finalError}</p>
-          <p class="details">${finalErrorDescription}</p>
-          <p>Please try again or contact support if the problem persists.</p>
-        </body>
-        </html>
-      `);
-      return;
-    }
-    
-    // Handle OAuth callback - Discord redirects to root path with hash fragment
-    if (req.url === '/' || req.url.startsWith('/?')) {
-      console.log('Serving OAuth callback page');
-
-      // Serve an HTML page that will extract the OAuth tokens from the URL fragment
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Processing Authentication...</title>
-          <style>
-            body {
-              font-family: 'Inter', Arial, sans-serif;
-              text-align: center;
-              padding: 50px;
-              background: linear-gradient(135deg, #0b0c0f 0%, #1a1d23 100%);
-              color: #e6e6e6;
-              margin: 0;
-              min-height: 100vh;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              align-items: center;
-            }
-            .container {
-              max-width: 500px;
-              background: rgba(255, 255, 255, 0.05);
-              border-radius: 16px;
-              padding: 40px;
-              box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
-              border: 1px solid rgba(0, 217, 255, 0.2);
-            }
-            .loading {
-              color: #00d9ff;
-              font-size: 48px;
-              margin: 20px 0;
-              animation: spin 1s linear infinite;
-            }
-            .message {
-              font-size: 18px;
-              margin: 20px 0;
-              line-height: 1.6;
-            }
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="loading">⟳</div>
-            <h1>Processing Authentication...</h1>
-            <p class="message">Please wait while we complete your sign-in.</p>
-          </div>
-
-          <script>
-            // Extract OAuth tokens from URL fragment
-            const hash = window.location.hash.substring(1);
-            if (hash) {
-              const params = new URLSearchParams(hash);
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-              const providerToken = params.get('provider_token');
-              const expiresAt = params.get('expires_at');
-
-              if (accessToken) {
-                console.log('Found OAuth tokens in fragment, sending to main process...');
-
-                // Send tokens to main process via a special endpoint
-                fetch('/oauth-callback', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    access_token: accessToken,
-                    refresh_token: refreshToken,
-                    provider_token: providerToken,
-                    expires_at: expiresAt
-                  })
-                })
-                .then(response => response.json())
-                .then(data => {
-                  if (data.success) {
-                    // Show success and auto-close
-                    document.querySelector('.container').innerHTML = \`
-                      <div class="loading" style="color: #00d9ff; animation: none;">✓</div>
-                      <h1>Authentication Successful!</h1>
-                      <p class="message">You have been successfully signed in with Discord.<br>Please close this browser window and return to Project Drift.</p>
-                    \`;
-
-                    // Auto-close after 3 seconds
-                    setTimeout(() => {
-                      window.close();
-                    }, 3000);
-                  } else {
-                    throw new Error(data.error || 'Authentication failed');
-                  }
-                })
-                .catch(error => {
-                  console.error('OAuth callback error:', error);
-                  document.querySelector('.container').innerHTML = \`
-                    <div class="loading" style="color: #ff4444; animation: none;">✗</div>
-                    <h1>Authentication Failed</h1>
-                    <p class="message">An error occurred during sign-in. Please try again.</p>
-                    <p style="font-size: 14px; color: #aaa;">\${error.message}</p>
-                  \`;
-                });
-              } else {
-                document.querySelector('.container').innerHTML = \`
-                  <div class="loading" style="color: #ff4444; animation: none;">✗</div>
-                  <h1>Authentication Failed</h1>
-                  <p class="message">No access token found. Please try again.</p>
-                \`;
-              }
-            } else {
-              // Check for error parameters in query string
-              const urlParams = new URLSearchParams(window.location.search);
-              const error = urlParams.get('error');
-              const errorDescription = urlParams.get('error_description');
-
-              if (error) {
-                document.querySelector('.container').innerHTML = \`
-                  <div class="loading" style="color: #ff4444; animation: none;">✗</div>
-                  <h1>Authentication Failed</h1>
-                  <p class="message">\${errorDescription || error}</p>
-                  <p class="message">Please try again.</p>
-                \`;
-              } else {
-                document.querySelector('.container').innerHTML = \`
-                  <div class="loading" style="color: #ff4444; animation: none;">?</div>
-                  <h1>Invalid Request</h1>
-                  <p class="message">This page should only be accessed through Discord OAuth.</p>
-                \`;
-              }
-            }
-          </script>
-        </body>
-        </html>
-      `);
-      return;
-    }
-
-    // Handle the POST request from the JavaScript above
-    if (req.url === '/oauth-callback' && req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => {
-        body += chunk.toString();
-      });
-
-      req.on('end', async () => {
-        try {
-          const tokens = JSON.parse(body);
-          console.log('Received OAuth tokens via POST:', { hasAccessToken: !!tokens.access_token });
-
-          if (tokens.access_token) {
-            // Set the session in the main process
-            const sessionResult = await auth.setSession(tokens.access_token, tokens.refresh_token);
-
-            if (sessionResult.success) {
-                  // Persist tokens so session can be restored after restart
-                  try {
-                    await saveAuthTokens({
-                      access_token: tokens.access_token,
-                      refresh_token: tokens.refresh_token,
-                      expires_at: tokens.expires_at
-                    });
-                  } catch (err) {
-                    console.warn('Failed to persist auth tokens:', err.message);
-                  }
-              console.log('Session set successfully in main process');
-
-              // Verify the session was set by checking it immediately
-              const { data: sessionData } = await auth.getCurrentSession();
-              console.log('Verified session after setting:', { hasSession: !!sessionData.session, hasUser: !!sessionData.session?.user });
-
-              // Notify the renderer that authentication succeeded
-              if (mainWindow && mainWindow.webContents) {
-                mainWindow.webContents.send('oauth-success');
-              }
-
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true }));
-            } else {
-              console.error('Failed to set session:', sessionResult.error);
-              res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: false, error: sessionResult.error }));
-            }
-          } else {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'No access token provided' }));
-          }
-        } catch (error) {
-          console.error('Error processing OAuth callback POST:', error);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: error.message }));
-        }
-      });
-      return;
-    }
-
-    // Handle 404 for other requests
-    res.writeHead(404, { 'Content-Type': 'text/html' });
-    res.end(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Not Found</title>
-      </head>
-      <body>
-        <h1>404 - Not Found</h1>
-      </body>
-      </html>
-    `);
-  });
-
-  // Try to listen on port 3001 first (required by Discord OAuth config)
-  callbackServer.listen(3001, 'localhost', () => {
-    console.log('OAuth callback server listening on http://localhost:3001');
-  });
-
-  callbackServer.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.log('Port 3001 is busy, attempting to free it...');
-
-      // Try to kill any process using port 3001
-      const { exec } = require('child_process');
-      exec('netstat -ano | findstr :3001', (error, stdout) => {
-        if (!error && stdout) {
-          const lines = stdout.split('\n');
-          for (const line of lines) {
-            if (line.includes('LISTENING')) {
-              const parts = line.trim().split(/\s+/);
-              const pid = parts[parts.length - 1];
-              if (pid && pid !== '0') {
-                console.log(`Attempting to kill process ${pid} using port 3001`);
-                exec(`taskkill /f /pid ${pid}`, (killError) => {
-                  if (!killError) {
-                    console.log('Killed conflicting process, retrying server start...');
-                    setTimeout(() => {
-                      callbackServer.listen(3001, 'localhost', () => {
-                        console.log('OAuth callback server listening on http://localhost:3001');
-                      });
-                    }, 1000);
-                  } else {
-                    console.error('Failed to kill conflicting process:', killError);
-                    console.log('Please close any applications using port 3001 and restart Project Drift');
-                  }
-                });
-                break;
-              }
-            }
-          }
-        } else {
-          console.log('Could not identify process using port 3001');
-          console.log('Please close any development servers or applications using port 3001');
-        }
-      });
-    } else {
-      console.error('Callback server error:', err);
-    }
-  });
-}
-
-// Persist auth tokens to disk so session survives restarts
-const AUTH_STORE_PATH = path.join(app.getPath ? app.getPath('userData') : __dirname, 'auth.json');
-
-async function saveAuthTokens(tokens) {
-  try {
-    const toSave = {
-      access_token: tokens.access_token || null,
-      refresh_token: tokens.refresh_token || null,
-      expires_at: tokens.expires_at || null
-    };
-    await fs.writeFile(AUTH_STORE_PATH, JSON.stringify(toSave, null, 2), { encoding: 'utf8' });
-    console.log('Saved auth tokens to', AUTH_STORE_PATH);
-  } catch (err) {
-    console.warn('Failed to save auth tokens:', err.message);
-  }
-}
-
-async function loadAuthTokens() {
-  try {
-    if (fsSync.existsSync(AUTH_STORE_PATH)) {
-      const raw = await fs.readFile(AUTH_STORE_PATH, { encoding: 'utf8' });
-      const parsed = JSON.parse(raw);
-      console.log('Loaded saved auth tokens');
-      return parsed;
-    }
-  } catch (err) {
-    console.warn('Failed to load auth tokens:', err.message);
-  }
-  return null;
-}
-
-// Stop the callback server
-function stopCallbackServer() {
-  if (callbackServer) {
-    callbackServer.close();
-    callbackServer = null;
-  }
-}
-
-// Handle OAuth callback URLs
-function handleOAuthCallback(url) {
-  console.log('Handling OAuth callback:', url);
-  
-  // Send the callback URL to the renderer process
-  if (mainWindow && mainWindow.webContents) {
-    mainWindow.webContents.send('oauth-callback', url);
-  }
-}
-
-// App event handlers
-app.whenReady().then(() => {
-  // Start the local callback server
-  startCallbackServer();
-
-  // Create the main window
-  createMainWindow();
-});
-
-// After app ready, attempt to rehydrate saved session (if any)
-app.whenReady().then(async () => {
-  try {
-    const tokens = await loadAuthTokens();
-    if (tokens && tokens.access_token) {
-      console.log('Rehydrating saved auth session');
-      const setResult = await auth.setSession(tokens.access_token, tokens.refresh_token);
-      if (setResult && setResult.success) {
-        console.log('Session rehydrated successfully from disk');
-      } else {
-        console.warn('Failed to rehydrate session:', setResult && setResult.error);
-      }
-    }
-  } catch (err) {
-    console.warn('Error during session rehydration:', err.message);
-  }
-});
-
-app.on('window-all-closed', () => {
-  // Stop the callback server when app closes
-  stopCallbackServer();
-  
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow();
-  }
-});
-
-// Function to create the main window
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      preload: path.join(__dirname, 'preload.js')
-    },
-    icon: path.join(__dirname, 'assets', 'icon.png'),
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0b0c0f',
-      symbolColor: '#e6e6e6'
-    }
-  });
-
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-
-  // Handle OAuth callback in renderer
-  mainWindow.webContents.on('did-finish-load', () => {
-    // Check if app was launched with OAuth callback
-    const url = process.argv.find(arg => arg.startsWith('projectdrift://'));
-    if (url) {
-      handleOAuthCallback(url);
-    }
-  });
-}
-
-// Download file with progress callback
-async function downloadFile(url, destPath, progressCallback) {
-  console.log(`[Download] Starting download: ${url} -> ${destPath}`);
-  return new Promise((resolve, reject) => {
-    const file = fsSync.createWriteStream(destPath);
-    let totalSize = 0;
-    let downloadedSize = 0;
-    let lastProgressUpdate = 0;
-
-    const request = https.get(url, (response) => {
-      console.log(`[Download] Response status: ${response.statusCode}`);
-      console.log(`[Download] Content-Type: ${response.headers['content-type']}`);
-      console.log(`[Download] Content-Length: ${response.headers['content-length']}`);
-
-      // Check if this is actually a download page instead of a file
-      const contentType = response.headers['content-type'] || '';
-      if (contentType.includes('text/html') || contentType.includes('text/plain')) {
-        console.log(`[Download] Detected HTML/text response, likely a download page instead of file`);
-        file.end();
-        reject(new Error('URL returned HTML page instead of file download'));
-        return;
-      }
-
-      if (response.statusCode === 302 || response.statusCode === 301) {
-        // Handle redirect
-        console.log(`[Download] Redirecting to: ${response.headers.location}`);
-        file.end();
-        // Follow redirect
-        downloadFile(response.headers.location, destPath, progressCallback).then(resolve).catch(reject);
-        return;
-      }
-
-      if (response.statusCode !== 200) {
-        file.end();
-        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
-        return;
-      }
-
-      totalSize = parseInt(response.headers['content-length'], 10) || 0;
-      console.log(`[Download] Total size: ${totalSize} bytes`);
-
-      response.on('data', (chunk) => {
-        downloadedSize += chunk.length;
-        file.write(chunk);
-
-        // Throttle progress updates to every 200ms to prevent erratic speed/ETA
-        const now = Date.now();
-        if (progressCallback && totalSize > 0 && (now - lastProgressUpdate) >= 200) {
-          const progress = (downloadedSize / totalSize) * 100;
-          progressCallback(progress, totalSize);
-          lastProgressUpdate = now;
-        }
-      });
-
-      response.on('end', () => {
-        file.end();
-        console.log(`[Download] Download completed, downloaded ${downloadedSize} bytes`);
-        // Validate download was successful
-        try {
-          const stats = fsSync.statSync(destPath);
-          console.log(`[Download] File size on disk: ${stats.size} bytes`);
-          if (stats.size === 0) {
-            reject(new Error('Downloaded file is empty'));
-            return;
-          }
-          // Check for minimum reasonable file size (Fortnite builds are at least 100MB)
-          if (stats.size < 100 * 1024 * 1024) { // 100MB minimum
-            console.log(`[Download] File too small (${stats.size} bytes), likely not a real build`);
-            reject(new Error(`Downloaded file too small (${Math.round(stats.size / 1024 / 1024)}MB), likely not a valid build`));
-            return;
-          }
-          // Send final progress update
-          if (progressCallback && totalSize > 0) {
-            progressCallback(100, totalSize);
-          }
-          resolve();
-        } catch (err) {
-          console.error(`[Download] Failed to validate file: ${err.message}`);
-          reject(new Error('Failed to validate downloaded file'));
-        }
-      });
-
-      response.on('error', (err) => {
-        console.error(`[Download] Response error: ${err.message}`);
-        file.end();
-        reject(err);
-      });
-    });
-
-    request.on('error', (err) => {
-      console.error(`[Download] Request error: ${err.message}`);
-      file.end();
-      reject(err);
-    });
-
-    file.on('error', (err) => {
-      console.error(`[Download] File write error: ${err.message}`);
-      reject(err);
-    });
-  });
-}
-
-// Check available disk space
-async function checkDiskSpace(requiredBytes, directory) {
-  try {
-    // Use a simple check - just ensure the directory exists and is writable
-    await fs.access(directory, fs.constants.W_OK);
-    console.log(`[Storage] Directory is writable: ${directory}`);
-    // For now, assume enough space - the download will fail if there's not enough space anyway
-    return { available: true };
-  } catch (error) {
-    console.warn('[Storage] Could not access directory:', error.message);
-    return { 
-      available: false, 
-      message: `Cannot write to download directory: ${directory}`
-    };
-  }
 }
 
 // Game server process
@@ -657,7 +88,7 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    icon: path.join(__dirname, '../assets/icon.png'), // TODO: Add icon file
+    icon: path.join(__dirname, '../assets/icon.png')
   });
 
   mainWindow.loadFile('src/renderer/index.html');
@@ -677,6 +108,30 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
+// ============================================
+// WINDOW CONTROLS
+// ============================================
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
+});
+
+// ============================================
+// APP LIFECYCLE
+// ============================================
 app.on('window-all-closed', () => {
   // Unregister P2P server
   if (hostedServerId) {
@@ -942,6 +397,164 @@ ipcMain.handle('get-server-status', async () => {
     running: gameServerProcess !== null,
     starting: serverStarting
   };
+});
+
+// ============================================
+// Discord OAuth Authentication (Direct)
+// ============================================
+
+const DISCORD_CLIENT_ID = '1432021829924552825';
+const DISCORD_REDIRECT_URI = 'http://localhost:53134/auth/callback'; // Random port to avoid conflicts
+
+let authWindow = null;
+
+// Load user from persistent storage on startup
+let currentAuthUser = store.get('auth.user', null);
+
+// Simple callback server for OAuth
+const createCallbackServer = () => {
+  const http = require('http');
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      if (req.url.startsWith('/auth/callback')) {
+        const url = new URL(req.url, `http://localhost:53134`);
+        const code = url.searchParams.get('code');
+        
+        if (code) {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end('<html><body><h1>Authentication successful!</h1><p>You can close this window.</p><script>window.close()</script></body></html>');
+          
+          server.close();
+          resolve(code);
+        } else {
+          res.writeHead(400, { 'Content-Type': 'text/html' });
+          res.end('<html><body><h1>Authentication failed</h1><p>No code received</p></body></html>');
+          
+          server.close();
+          reject(new Error('No authorization code'));
+        }
+      }
+    });
+    
+    server.listen(53134, 'localhost', () => {
+      console.log('[Auth] Callback server listening on port 53134');
+    });
+    
+    // Timeout after 2 minutes
+    setTimeout(() => {
+      server.close();
+      reject(new Error('Authentication timeout'));
+    }, 120000);
+  });
+};
+
+ipcMain.handle('auth-signin-discord', async () => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Start callback server
+      const codePromise = createCallbackServer();
+      
+      // Create Discord OAuth URL (no client secret exposed!)
+      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
+      
+      console.log('[Auth] Starting Discord OAuth (direct)');
+      
+      // Create auth window
+      authWindow = new BrowserWindow({
+        width: 500,
+        height: 700,
+        show: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
+        }
+      });
+      
+      authWindow.loadURL(authUrl);
+      
+      // Wait for callback server to receive code
+      const code = await codePromise;
+      console.log('[Auth] Authorization code received');
+      
+      // Close auth window
+      if (authWindow) {
+        authWindow.close();
+        authWindow = null;
+      }
+      
+      // Exchange code for token (using Discord's public API)
+      const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', 
+        new URLSearchParams({
+          client_id: DISCORD_CLIENT_ID,
+          client_secret: process.env.DISCORD_CLIENT_SECRET || '0vTx2UYF6VfV4aVYss6-c5qbmiBycxF5', // Move to env var
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: DISCORD_REDIRECT_URI
+        }), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      const { access_token, refresh_token } = tokenResponse.data;
+      console.log('[Auth] Access token received, fetching user data...');
+      
+      // Fetch user data from Discord
+      const userResponse = await axios.get('https://discord.com/api/users/@me', {
+        headers: {
+          Authorization: `Bearer ${access_token}`
+        }
+      });
+      
+      const discordUser = userResponse.data;
+      console.log('[Auth] Discord user authenticated:', discordUser.username);
+      
+      // Store user with full Discord profile
+      currentAuthUser = {
+        id: discordUser.id,
+        username: discordUser.username,
+        discriminator: discordUser.discriminator,
+        avatar: discordUser.avatar,
+        avatarUrl: discordUser.avatar 
+          ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png?size=128`
+          : `https://cdn.discordapp.com/embed/avatars/${(parseInt(discordUser.discriminator) || 0) % 5}.png`,
+        provider: 'discord',
+        accessToken: access_token,
+        refreshToken: refresh_token
+      };
+      
+      // Save to persistent storage
+      store.set('auth.user', currentAuthUser);
+      console.log('[Auth] User session saved to storage');
+      
+      resolve({ success: true, user: currentAuthUser });
+      
+    } catch (error) {
+      console.error('[Auth] Discord OAuth error:', error.message);
+      if (authWindow) {
+        authWindow.close();
+        authWindow = null;
+      }
+      reject(error);
+    }
+  });
+});
+
+ipcMain.handle('auth-signout', async () => {
+  currentAuthUser = null;
+  // Clear from persistent storage
+  store.delete('auth.user');
+  console.log('[Auth] User session cleared from storage');
+  return { success: true };
+});
+
+ipcMain.handle('auth-get-current-user', async () => {
+  return currentAuthUser;
+});
+
+ipcMain.handle('auth-get-session', async () => {
+  return currentAuthUser ? { authenticated: true, user: currentAuthUser } : { authenticated: false };
 });
 
 // ============================================
@@ -1342,143 +955,65 @@ async function getLocalBuilds() {
 // Download build from GitHub or direct URL
 ipcMain.handle('download-build', async (event, build) => {
   try {
-    // Use custom download path if provided, otherwise use default
-    const downloadDir = build.downloadPath || BUILDS_DIR;
-    await fs.mkdir(downloadDir, { recursive: true });
-    
-    const buildPath = path.join(downloadDir, `build-${build.id}`);
+    const buildPath = path.join(BUILDS_DIR, `build-${build.id}`);
     await fs.mkdir(buildPath, { recursive: true });
     
-    // Try multiple download URLs (mirrors) in order
-    const urls = build.downloadUrls || [build.downloadUrl || build.url];
+    // Download URL can be GitHub release, direct link, etc.
+    const downloadUrl = build.downloadUrl || build.url;
     
-    // Add some common fallback mirrors based on the build version
-    const fallbackUrls = [];
-    if (build.version || build.name) {
-      const version = build.version || build.name;
-      // Try some common mirror patterns
-      if (version.includes('1.11')) {
-        fallbackUrls.push('https://archive.org/download/fortnite-1.11/Fortnite_1.11.zip');
-      } else if (version.includes('5.00')) {
-        fallbackUrls.push('https://archive.org/download/fortnite-5.00/Fortnite_5.00.rar');
-      } else if (version.includes('7.00')) {
-        fallbackUrls.push('https://archive.org/download/fortnite-7.00/Fortnite_7.00.zip');
-      }
-    }
-    
-    const allUrls = [...urls, ...fallbackUrls];
-    
-    if (!urls || urls.length === 0 || !urls[0]) {
+    if (!downloadUrl) {
       return {
         success: false,
         error: 'No download URL provided for this build'
       };
     }
     
-    // Check available disk space before downloading
-    // Estimate required space: Fortnite builds are typically 10-20GB, plus extraction space
-    const estimatedSize = 25 * 1024 * 1024 * 1024; // 25GB estimate
-    const spaceCheck = await checkDiskSpace(estimatedSize, downloadDir);
-    if (!spaceCheck.available) {
-      return {
-        success: false,
-        error: spaceCheck.message || 'Not enough disk space for download'
-      };
-    }
+    console.log(`Downloading build ${build.name} from ${downloadUrl}`);
     
-    // Try each URL until one succeeds
-    for (let i = 0; i < allUrls.length; i++) {
-      const downloadUrl = allUrls[i];
-      
-      try {
-        console.log(`Trying URL ${i + 1}/${urls.length}: ${downloadUrl}`);
-        
-        if (i > 0) {
-          event.sender.send('download-status', { 
-            buildId: build.id, 
-            status: `Trying mirror ${i + 1}/${allUrls.length}...` 
-          });
+    const lowerUrl = downloadUrl.toLowerCase();
+    const isZip = lowerUrl.endsWith('.zip');
+    const isRar = lowerUrl.endsWith('.rar');
+    const is7z = lowerUrl.endsWith('.7z');
+
+    if (isZip || isRar || is7z) {
+      const archivePath = path.join(buildPath, `build${isZip ? '.zip' : isRar ? '.rar' : '.7z'}`);
+
+      // Download the archive
+      await downloadFile(downloadUrl, archivePath, (progress) => {
+        event.sender.send('download-progress', { buildId: build.id, progress });
+      });
+
+      // Extract the archive
+      event.sender.send('download-status', { buildId: build.id, status: 'Extracting...' });
+
+      if (isZip) {
+        await extract(archivePath, { dir: buildPath });
+      } else {
+        if (!sevenZipPath) {
+          throw new Error('RAR/7z extraction requires 7zip. Please install dependency or provide a ZIP file.');
         }
-    
-        const lowerUrl = downloadUrl.toLowerCase();
-        const isZip = lowerUrl.endsWith('.zip');
-        const isRar = lowerUrl.endsWith('.rar');
-        const is7z = lowerUrl.endsWith('.7z');
-
-        if (isZip || isRar || is7z) {
-          const archivePath = path.join(buildPath, `build${isZip ? '.zip' : isRar ? '.rar' : '.7z'}`);
-
-          // Download the archive
-          console.log(`[Download] Starting download of archive: ${downloadUrl}`);
-          await downloadFile(downloadUrl, archivePath, (progress, totalSize) => {
-            event.sender.send('download-progress', { buildId: build.id, progress, totalSize });
-          });
-          console.log(`[Download] Archive download completed`);
-
-          // Extract the archive
-          event.sender.send('download-status', { buildId: build.id, status: 'Extracting files...' });
-
-          if (isZip) {
-            await extract(archivePath, { dir: buildPath });
-          } else {
-            if (!sevenZipPath) {
-              throw new Error('RAR/7z extraction requires 7zip. Please install dependency or provide a ZIP file.');
-            }
-            await new Promise((resolve, reject) => {
-              const p = spawn(sevenZipPath, ['x', archivePath, `-o${buildPath}`, '-y'], { stdio: 'ignore' });
-              p.on('close', (code) => code === 0 ? resolve(null) : reject(new Error(`7zip exited with code ${code}`)));
-              p.on('error', reject);
-            });
-          }
-
-          // Delete the archive file
-          console.log(`[Download] Removing archive file: ${archivePath}`);
-          await fs.unlink(archivePath).catch((err) => {
-            console.warn(`[Download] Failed to remove archive: ${err.message}`);
-          });
-        } else {
-          // Direct download (assume executable)
-          const exePath = path.join(buildPath, 'FortniteClient-Win64-Shipping.exe');
-          console.log(`[Download] Starting direct download: ${downloadUrl}`);
-          await downloadFile(downloadUrl, exePath, (progress, totalSize) => {
-            event.sender.send('download-progress', { buildId: build.id, progress, totalSize });
-          });
-          console.log(`[Download] Direct download completed`);
-        }
-        
-        // Save metadata
-        const metaPath = path.join(buildPath, 'meta.json');
-        await fs.writeFile(metaPath, JSON.stringify(build, null, 2));
-        
-        console.log(`Successfully downloaded build ${build.name} using URL ${i + 1}`);
-        return { success: true, path: buildPath };
-        
-      } catch (error) {
-        console.warn(`URL ${i + 1} failed: ${error.message}`);
-        lastError = error;
-        
-        // Clean up failed download
-        try {
-          await fs.rm(buildPath, { recursive: true, force: true });
-        } catch (cleanupError) {
-          console.warn('Failed to clean up failed download:', cleanupError.message);
-        }
-        
-        // If this isn't the last URL, continue to next mirror
-        if (i < allUrls.length - 1) {
-          // Small delay before trying next mirror
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          continue;
-        }
+        await new Promise((resolve, reject) => {
+          const p = spawn(sevenZipPath, ['x', archivePath, `-o${buildPath}`, '-y'], { stdio: 'ignore' });
+          p.on('close', (code) => code === 0 ? resolve(null) : reject(new Error(`7zip exited with code ${code}`)));
+          p.on('error', reject);
+        });
       }
+
+      // Delete the archive file
+      await fs.unlink(archivePath).catch(() => {});
+    } else {
+      // Direct download (assume executable)
+      const exePath = path.join(buildPath, 'FortniteClient-Win64-Shipping.exe');
+      await downloadFile(downloadUrl, exePath, (progress) => {
+        event.sender.send('download-progress', { buildId: build.id, progress });
+      });
     }
     
-    // All URLs failed
-    console.error('All download URLs failed for build:', build.name);
-    return { 
-      success: false, 
-      error: `All download URLs failed. Last error: ${lastError?.message || 'Unknown error'}` 
-    };
+    // Save metadata
+    const metaPath = path.join(buildPath, 'meta.json');
+    await fs.writeFile(metaPath, JSON.stringify(build, null, 2));
+    
+    return { success: true, path: buildPath };
   } catch (error) {
     console.error('Download failed:', error);
     return { 
@@ -1507,7 +1042,7 @@ function downloadFile(url, dest, onProgress) {
         downloadedSize += chunk.length;
         if (onProgress && totalSize) {
           const progress = (downloadedSize / totalSize) * 100;
-          onProgress(progress, totalSize);
+          onProgress(progress);
         }
       });
       
@@ -1721,377 +1256,188 @@ async function findExecutableRecursive(startDir, maxDepth = 3, depth = 0) {
 }
 
 // Launch game - connects to Project Drift game server
-// ========================================
-// PROJECT REBOOT LAUNCH METHOD
-// Integrated LawinServer + DLL Injection
-// ========================================
-let mcpBackendProcess = null;
-
-async function startMcpBackend() {
-  return new Promise((resolve, reject) => {
-    const mcpPath = path.join(__dirname, '..', '..', 'mcp-backend');
-    const lawinExe = path.join(mcpPath, 'lawinserver.exe');
-    
-    console.log('[MCP] Starting LawinServer executable');
-    
-    // Check if lawinserver.exe exists
-    if (!fsSync.existsSync(lawinExe)) {
-      reject(new Error('lawinserver.exe not found! Copy from Reboot Launcher.'));
-      return;
-    }
-    
-    mcpBackendProcess = spawn(lawinExe, [], {
-      cwd: mcpPath,
-      detached: false,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    
-    let startupOutput = '';
-    mcpBackendProcess.stdout.on('data', (data) => {
-      const text = data.toString();
-      startupOutput += text;
-      console.log('[MCP]', text.trim());
-      
-      // LawinServer.exe likely outputs different startup message
-      if (text.includes('listening') || text.includes('started')) {
-        resolve(true);
-      }
-    });
-    
-    mcpBackendProcess.stderr.on('data', (data) => {
-      console.error('[MCP Error]', data.toString().trim());
-    });
-    
-    mcpBackendProcess.on('error', (err) => {
-      console.error('[MCP] Failed to start:', err);
-      reject(err);
-    });
-    
-    mcpBackendProcess.on('exit', (code) => {
-      console.log(`[MCP] Backend exited with code ${code}`);
-      mcpBackendProcess = null;
-    });
-    
-    // Timeout after 5 seconds - exe starts faster than Node.js
-    setTimeout(() => {
-      resolve(true); // Assume success if no errors
-    }, 5000);
-  });
-}
-
 ipcMain.handle('launch-game', async (event, { buildId }) => {
   try {
-    console.log('========================================');
-    console.log('PROJECT DRIFT LAUNCHER');
-    console.log('========================================');
-    
-    // STEP 1: Start MCP Backend (LawinServer)
-    console.log('[1/6] Starting MCP Backend...');
-    if (!mcpBackendProcess) {
+    // Ensure game server is running (only if docker-compose defines a 'server' service)
+    if (!gameServerProcess && !serverStarting) {
       try {
-        await startMcpBackend();
-        console.log('✓ MCP Backend started');
-    
-    // Ensure hosts file has Epic redirects
-    try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-      const hostsContent = fsSync.readFileSync(hostsPath, 'utf8');
-      
-      const requiredRedirects = [
-        '127.0.0.1 account-public-service-prod03.ol.epicgames.com',
-        '127.0.0.1 fortnite-public-service-prod11.ol.epicgames.com',
-        '127.0.0.1 lightswitch-public-service-prod06.ol.epicgames.com'
-      ];
-      
-      let needsUpdate = false;
-      for (const redirect of requiredRedirects) {
-        if (!hostsContent.includes(redirect.split(' ')[1])) {
-          needsUpdate = true;
-          break;
+        const projectDir = path.join(__dirname, '..', '..');
+        const composeFile = path.join(projectDir, 'docker-compose.dev.yml');
+        if (fsSync.existsSync(composeFile)) {
+          const { stdout } = await execPromise('docker-compose -f docker-compose.dev.yml config --services', { cwd: projectDir });
+          const services = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+          if (services.includes('server')) {
+            console.log('Starting game server before launch...');
+            await startGameServer();
+          }
         }
+      } catch (_) {
+        // Ignore auto-start if detection fails
       }
-      
-      if (needsUpdate) {
-        console.log('⚠ Hosts file needs Epic redirects. Please run setup-mcp.ps1 as administrator.');
-      }
-    } catch (err) {
-      console.warn('Could not check hosts file:', err.message);
-    }
-      } catch (err) {
-        console.error('✗ MCP Backend failed:', err.message);
-        return { success: false, error: 'Failed to start MCP Backend: ' + err.message };
-      }
-    } else {
-      console.log('✓ MCP Backend already running');
     }
     
-    // STEP 2: Get build info
-    console.log('[2/6] Loading build...');
+    // Wait for server to be ready
+    let waitTime = 0;
+    while (serverStarting && waitTime < 10000) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      waitTime += 500;
+    }
+    
+    // Get build info
     const buildPath = path.join(BUILDS_DIR, `build-${buildId}`);
     const metaPath = path.join(buildPath, 'meta.json');
     const metaData = await fs.readFile(metaPath, 'utf8');
     const build = JSON.parse(metaData);
     
-    // Find game executable
+    // Find the game executable
     let exePath = build.exePath;
     if (!exePath) {
+      // Try common locations
       const possiblePaths = [
         path.join(buildPath, 'FortniteGame', 'Binaries', 'Win64', 'FortniteClient-Win64-Shipping.exe'),
-        path.join(buildPath, 'FortniteClient-Win64-Shipping.exe')
+        path.join(buildPath, 'FortniteClient-Win64-Shipping.exe'),
+        path.join(buildPath, 'Fortnite.exe')
       ];
       
       for (const p of possiblePaths) {
-        if (fsSync.existsSync(p)) {
+        try {
+          await fs.access(p);
           exePath = p;
           break;
-        }
+        } catch {}
       }
     }
     
-    if (!exePath || !fsSync.existsSync(exePath)) {
-      return { success: false, error: 'Could not find game executable' };
+    if (!exePath) {
+      return {
+        success: false,
+        error: 'Could not find game executable'
+      };
     }
     
-    const gameDir = path.dirname(exePath);
-    const launcherPath = path.join(gameDir, 'FortniteLauncher.exe');
+    // Get available game server from matchmaking API
+    let serverIp = '127.0.0.1';
+    let serverPort = '7777';
     
-    // Check launcher size to detect ERA builds
-    if (fsSync.existsSync(launcherPath)) {
-      const stats = await fs.stat(launcherPath);
-      if (stats.size < 200000) {
-        return { 
-          success: false, 
-          error: 'ERA build detected! Project Drift does not support ERA builds. Please use a stock Fortnite build.' 
-        };
-      }
-    }
-    
-    console.log(`✓ Build loaded: ${build.name}`);
-    
-    // STEP 3: Disable anti-cheat
-    console.log('[3/6] Disabling anti-cheat...');
-    
-    // COMPLETELY REMOVE BattlEye folder (not just DLL)
-    const battleEyeFolder = path.join(gameDir, 'BattlEye');
-    if (fsSync.existsSync(battleEyeFolder)) {
-      try {
-        // Backup BattlEye folder if not already backed up
-        const backupFolder = battleEyeFolder + '.bak';
-        if (!fsSync.existsSync(backupFolder)) {
-          await fs.rename(battleEyeFolder, backupFolder);
-          console.log('✓ BattlEye folder backed up and removed');
-        } else {
-          // Backup exists, just delete current BattlEye folder
-          await fs.rm(battleEyeFolder, { recursive: true, force: true });
-          console.log('✓ BattlEye folder deleted');
-        }
-      } catch (err) {
-        console.error('✗ Failed to remove BattlEye:', err.message);
-      }
-    }
-    
-    // Also remove EasyAntiCheat if present
-    const eacFolder = path.join(gameDir, 'EasyAntiCheat');
-    if (fsSync.existsSync(eacFolder)) {
-      try {
-        const backupFolder = eacFolder + '.bak';
-        if (!fsSync.existsSync(backupFolder)) {
-          await fs.rename(eacFolder, backupFolder);
-        } else {
-          await fs.rm(eacFolder, { recursive: true, force: true });
-        }
-        console.log('✓ EasyAntiCheat removed');
-      } catch (err) {
-        console.error('✗ Failed to remove EasyAntiCheat:', err.message);
-      }
-    }
-    
-    // Remove NVIDIA Aftermath
     try {
-      const aftermathFiles = fsSync.readdirSync(gameDir, { recursive: true })
-        .filter(f => f.includes('GFSDK_Aftermath_Lib'));
-      for (const file of aftermathFiles) {
-        await fs.unlink(path.join(gameDir, file)).catch(() => {});
+      const response = await axios.get(`${API_URL}/servers/available`, {
+        timeout: 3000
+      });
+      
+      if (response.data && response.data.length > 0) {
+        const server = response.data[0];
+        serverIp = server.ip || server.host;
+        serverPort = server.port;
       }
-      if (aftermathFiles.length > 0) {
-        console.log('✓ NVIDIA Aftermath removed');
-      }
-    } catch {}
-    console.log('✓ Anti-cheat disabled');
-    
-    // STEP 4: Start and suspend launcher (CRITICAL for game to work)
-    console.log('[4/6] Starting and suspending launcher...');
-    
-    let launcherPid = null;
-    if (fsSync.existsSync(launcherPath)) {
-      try {
-        // Create a PowerShell script file to suspend the launcher
-        const suspendScript = path.join(require('os').tmpdir(), 'suspend-launcher.ps1');
-        const psContent = `
-$launcherProc = Start-Process "${launcherPath.replace(/\\/g, '\\\\')}" -PassThru -WindowStyle Hidden
-
-Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-public class NativeMethods {
-    [DllImport("ntdll.dll", SetLastError=true)]
-    public static extern uint NtSuspendProcess(IntPtr processHandle);
-    
-    [DllImport("kernel32.dll", SetLastError=true)]
-    public static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
-    
-    [DllImport("kernel32.dll", SetLastError=true)]
-    public static extern bool CloseHandle(IntPtr hObject);
-}
-"@
-
-# IMMEDIATELY suspend - no delay for BattlEye to start!
-$handle = [NativeMethods]::OpenProcess(0x1F0FFF, $false, $launcherProc.Id)
-if ($handle -ne [IntPtr]::Zero) {
-    [NativeMethods]::NtSuspendProcess($handle) | Out-Null
-    [NativeMethods]::CloseHandle($handle) | Out-Null
-    Write-Output $launcherProc.Id
-} else {
-    Write-Error "Failed to open process"
-    exit 1
-}
-`;
-        
-        await fs.writeFile(suspendScript, psContent);
-        
-        const { stdout } = await execPromise(`powershell -ExecutionPolicy Bypass -File "${suspendScript}"`);
-        launcherPid = stdout.trim();
-        
-        await fs.unlink(suspendScript).catch(() => {});
-        
-        console.log(`✓ Launcher suspended (PID: ${launcherPid})`);
-      } catch (err) {
-        console.error('✗ Failed to suspend launcher:', err.message);
-        console.error('  Game will likely crash without suspended launcher!');
-        return { success: false, error: 'Failed to suspend launcher: ' + err.message };
-      }
-    } else {
-      console.error('✗ FortniteLauncher.exe not found!');
-      return { success: false, error: 'FortniteLauncher.exe not found' };
+    } catch (err) {
+      console.warn('Could not fetch server, using localhost:', err.message);
     }
     
-    // Wait a bit for launcher to fully suspend
-    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log(`Launching ${build.name} -> ${serverIp}:${serverPort}`);
     
-    console.log('[4/6] Starting Fortnite...');
-    
-    // Launch game - LET REBOOT.DLL HANDLE SERVER SETUP!
-    const gameArgs = [
-      '-epicapp=Fortnite',
-      '-epicenv=Prod',
-      '-epicportal',
-      '-skippatchcheck',
-      '-nobe',
-      '-noeac',
+    // Launch arguments for Fortnite
+    // Use -epicapp and -AUTH_LOGIN/PASSWORD to simulate Epic Launcher launch
+    const args = [
+      '-log',
       '-windowed',
-      '-ResX=1920',
-      '-ResY=1080',
-      '-AUTH_LOGIN=drift@projectdrift.dev',
-      '-AUTH_PASSWORD=ProjectDrift',
-      '-AUTH_TYPE=epic',
-      '-log'               // Enable logging
+      '-ResX=1280',
+      '-ResY=720',
+      '-NoEAC',
+      '-fromfl=eac',  // Tell game it's FROM the launcher (eac = Epic Anti Cheat/Launcher)
+      '-fltoken=h1cdhchd10150221h130eB56',  // Fake launcher token
+      '-skippatchcheck',
+      '-nosplash',
+      '-AUTH_LOGIN=unused@unused',  // Fake Epic account email
+      '-AUTH_PASSWORD=',  // Empty password (bypassed anyway)
+      '-AUTH_TYPE=epic',  // Auth type
+      '-epicapp=Fortnite',  // Epic app ID
+      '-epicenv=Prod',  // Epic environment
+      '-EpicPortal',  // Launched from Epic Games Launcher
+      '-epicusername=ProjectDriftUser',  // Display name
+      '-epicuserid=0000000000000000000000000000000000000000',  // Fake Epic user ID
+      '-epiclocale=en'  // Locale
     ];
     
-    const gameProcess = spawn(exePath, gameArgs, {
+    // Spawn the game process
+    const gameProcess = spawn(exePath, args, {
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      cwd: gameDir
+      cwd: path.dirname(exePath)
     });
     
-    gameProcess.stdout.on('data', (data) => console.log('[Fortnite]', data.toString().trim()));
-    gameProcess.stderr.on('data', (data) => console.log('[Fortnite Err]', data.toString().trim()));
+    // Log game output for debugging
+    if (gameProcess.stdout) {
+      gameProcess.stdout.on('data', (data) => {
+        console.log('[Fortnite]', data.toString().trim());
+      });
+    }
+    if (gameProcess.stderr) {
+      gameProcess.stderr.on('data', (data) => {
+        console.log('[Fortnite Error]', data.toString().trim());
+      });
+    }
     
     gameProcess.on('error', (err) => {
-      console.error('[Fortnite] Failed to start:', err);
+      console.error('Failed to start game:', err);
+      event.sender.send('launch-error', { error: err.message });
     });
     
-    gameProcess.on('exit', (code, signal) => {
-      console.log(`[Fortnite] Process exited with code ${code}, signal ${signal}`);
-      if (code !== 0 && code !== null) {
-        console.error('[Fortnite] Game crashed! Check logs above for errors.');
-      }
-    });
+    // Wait for process to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    console.log(`✓ Game started (PID: ${gameProcess.pid})`);
-    
-    // STEP 5: Wait and inject DLLs (Project Reboot sequence)
-    console.log('[5/6] Injecting DLLs (Reboot sequence)...');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds (reduced!)
-    
-    // Essential patches - INJECT reboot.dll EARLIER!
-    const dllsToInject = [
-      { name: 'cobalt.dll', desc: 'auth redirect', critical: true, delayAfter: 800 },
-      { name: 'memory.dll', desc: 'memory leak fix', critical: false, delayAfter: 500 },
-      { name: 'reboot.dll', desc: 'game server handler', critical: true, delayAfter: 1000 }, // INJECT EARLY!
-      { name: 'console.dll', desc: 'UE4 console', critical: false, delayAfter: 2000 } // Console last
-    ];
-    
+    // Inject bypass DLL
+    const bypassDllPath = path.join(__dirname, '..', '..', 'release', 'bypass', 'bypass.dll');
     const injectorPath = path.join(__dirname, '..', '..', 'release', 'bypass', 'injector.exe');
-    let injectedCount = 0;
-    let gameStillRunning = true;
     
-    for (const dll of dllsToInject) {
-      // Check if game is still running before injecting next DLL
+    // Check if bypass exists
+    if (fsSync.existsSync(bypassDllPath) && fsSync.existsSync(injectorPath)) {
+      console.log('Injecting bypass DLL...');
       try {
-        process.kill(gameProcess.pid, 0); // Check if process exists
-      } catch {
-        console.error(`  ✗ Game crashed before injecting ${dll.name}`);
-        gameStillRunning = false;
-        break;
-      }
-      
-      const dllPath = path.join(__dirname, '..', '..', 'release', 'bypass', dll.name);
-      if (fsSync.existsSync(dllPath) && fsSync.existsSync(injectorPath)) {
-        try {
-          // Run injector as administrator for reboot.dll
-          const injectCmd = dll.name === 'reboot.dll' 
-            ? `powershell -Command "Start-Process '${injectorPath}' -ArgumentList '${gameProcess.pid} \\"${dllPath}\\"' -Verb RunAs -Wait"`
-            : `"${injectorPath}" ${gameProcess.pid} "${dllPath}"`;
+        // Wait for FortniteClient-Win64-Shipping.exe to spawn
+        let targetPid = null;
+        let attempts = 0;
+        
+        console.log('Waiting for FortniteClient-Win64-Shipping.exe...');
+        while (!targetPid && attempts < 30) {
+          try {
+            // Find FortniteClient-Win64-Shipping.exe process
+            const { stdout } = await execPromise('powershell -Command "Get-Process -Name FortniteClient-Win64-Shipping -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"');
+            const pids = stdout.trim().split(/\r?\n/).filter(p => p.trim());
+            
+            if (pids.length > 0) {
+              // Get the most recent one (highest PID)
+              targetPid = parseInt(pids[pids.length - 1].trim());
+              console.log(`Found FortniteClient-Win64-Shipping.exe (PID: ${targetPid})`);
+              break;
+            }
+          } catch {}
           
-          await execPromise(injectCmd);
-          console.log(`  ✓ ${dll.name} injected (${dll.desc})`);
-          injectedCount++;
-          
-          // Wait after each injection with specific timing
-          if (dll.delayAfter) {
-            await new Promise(resolve => setTimeout(resolve, dll.delayAfter));
-          }
-        } catch (err) {
-          console.error(`  ✗ ${dll.name} failed:`, err.message);
-          if (dll.critical) {
-            console.error(`     ${dll.name} is critical - game may not work properly`);
-          }
+          await new Promise(resolve => setTimeout(resolve, 200));
+          attempts++;
         }
-      } else {
-        console.warn(`  ⚠ ${dll.name} not found, skipping`);
+        
+        if (!targetPid) {
+          console.warn('Could not find FortniteClient-Win64-Shipping.exe process');
+          console.warn('Injection failed - game may crash');
+        } else {
+          // Give the process a moment to initialize
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Run injector on the actual game process
+          const { stdout, stderr } = await execPromise(`"${injectorPath}" ${targetPid} "${bypassDllPath}"`);
+          console.log('[Injector]', stdout);
+          if (stderr) console.log('[Injector Err]', stderr);
+          
+          console.log('Bypass injected successfully - Epic launcher checks bypassed');
+        }
+      } catch (injectErr) {
+        console.warn('Failed to inject bypass (game may not work):', injectErr.message);
+        console.warn('To build bypass: run build-bypass.bat');
       }
+    } else {
+      console.warn('Bypass DLL not found. Build it with: build-bypass.bat');
+      console.warn('Game may fail to launch without Epic Games Launcher');
     }
-    
-    if (!gameStillRunning) {
-      console.error('Game crashed during DLL injection!');
-      console.error('This might be a DLL compatibility issue with Season 4.');
-      return { success: false, error: 'Game crashed during DLL injection' };
-    }
-    
-    console.log(`✓ Injected ${injectedCount}/${dllsToInject.length} DLLs`);
-    
-    // STEP 6: Complete
-    console.log('[6/6] Launch complete!');
-    console.log('========================================');
-    console.log(`✓ MCP Backend: Running on port 3551`);
-    console.log(`✓ Fortnite: PID ${gameProcess.pid}`);
-    console.log(`✓ DLLs: ${injectedCount}/${dllsToInject.length} injected`);
-    console.log('========================================\n');
-    
-    // Cleanup on exit
-    gameProcess.on('exit', () => {
-      console.log('Game exited');
-    });
     
     // Register as P2P server
     const registerResult = await registerServer(build.version);
@@ -2109,7 +1455,7 @@ if ($handle -ne [IntPtr]::Zero) {
     
     gameProcess.unref();
     
-    return { success: true, message: 'Game launched successfully!' };
+    return { success: true, server: `${serverIp}:${serverPort}` };
   } catch (error) {
     console.error('Launch failed:', error);
     return { 
@@ -2146,128 +1492,234 @@ ipcMain.handle('get-friends', async () => {
     const response = await axios.get(`${API_URL}/users/${userData.id}/friends`);
     return { success: true, friends: response.data };
   } catch (error) {
-    return {
-      success: false,
-      error: 'Failed to fetch friends'
+    return { 
+      success: false, 
+      error: 'Failed to fetch friends' 
     };
   }
 });
 
-// Download path selection
-ipcMain.handle('select-download-path', async () => {
+// ============================================
+// SETTINGS HANDLERS
+// ============================================
+ipcMain.handle('settings-get', async (event, key) => {
   try {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory'],
-      title: 'Select Download Directory',
-      defaultPath: path.join(app.getPath('downloads'), 'Project Drift Builds')
+    return store.get(`settings.${key}`, null);
+  } catch (error) {
+    console.error('[Settings] Get failed:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('settings-set', async (event, key, value) => {
+  try {
+    store.set(`settings.${key}`, value);
+    return { success: true };
+  } catch (error) {
+    console.error('[Settings] Set failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================
+// CATALOG HANDLERS
+// ============================================
+// Parse GitHub build archive README
+async function parseGitHubCatalog() {
+  try {
+    const response = await axios.get('https://raw.githubusercontent.com/llamaqwerty/fortnite-builds-archive/main/README.md', {
+      timeout: 10000
     });
-    return result;
+    
+    const readme = response.data;
+    const builds = [];
+    
+    // Parse the markdown table structure
+    const lines = readme.split('\n');
+    let currentSeason = null;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Detect season headers
+      if (line.match(/^##\s+(Season\s+\d+|Pre-Season|Online Testing)/i)) {
+        currentSeason = line.replace(/^##\s+/, '').trim();
+        continue;
+      }
+      
+      // Parse build rows (format: | Version | Link1 | Link2 | Link3 |)
+      if (line.startsWith('|') && !line.includes('---') && currentSeason) {
+        const parts = line.split('|').map(p => p.trim()).filter(p => p);
+        
+        if (parts.length >= 2) {
+          const versionPart = parts[0];
+          const links = parts.slice(1).filter(l => l.startsWith('http'));
+          
+          // Extract version and CL number
+          const versionMatch = versionPart.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+          const clMatch = versionPart.match(/CL-(\d+)/);
+          
+          if (versionMatch && links.length > 0 && !versionPart.toLowerCase().includes('lost') && !versionPart.toLowerCase().includes('unavailable')) {
+            const version = versionMatch[1];
+            const cl = clMatch ? clMatch[1] : null;
+            
+            builds.push({
+              id: `fn-${version}-${cl || 'unknown'}`,
+              name: `Fortnite ${version}`,
+              version: version,
+              cl: cl,
+              season: currentSeason,
+              downloadUrl: links[0], // Primary link
+              altLinks: links.slice(1), // Alternative links
+              size: 'Unknown', // Size not provided in README
+              description: `${currentSeason} - CL-${cl || 'Unknown'}`
+            });
+          }
+        }
+      }
+    }
+    
+    console.log(`[Catalog] Parsed ${builds.length} builds from GitHub`);
+    return builds;
   } catch (error) {
-    console.error('Failed to select download path:', error);
-    return { canceled: true };
+    console.error('[Catalog] Failed to parse GitHub catalog:', error);
+    return [];
   }
-});
+}
 
-// Get default download path
-ipcMain.handle('get-default-download-path', () => {
-  return path.join(app.getPath('downloads'), 'Project Drift Builds');
-});
-
-// Authentication IPC handlers
-ipcMain.handle('auth-signin-discord', async () => {
-  console.log('Processing Discord signin');
+ipcMain.handle('catalog-get-all', async () => {
   try {
-    const result = await auth.signInWithDiscord();
-    if (result.success && result.url) {
-      // Open the OAuth URL in the user's default browser
-      const { shell } = require('electron');
-      await shell.openExternal(result.url);
-      return { success: true, message: 'OAuth URL opened in browser' };
-    } else {
-      throw new Error(result.error || 'Failed to get OAuth URL');
-    }
+    // Fetch from GitHub build archive
+    const builds = await parseGitHubCatalog();
+    return builds;
   } catch (error) {
-    console.error('Discord signin error:', error);
-    return { success: false, error: error.message };
+    console.log('[Catalog] Failed to fetch catalog:', error);
+    return [];
   }
 });
 
-ipcMain.handle('auth-signout', async () => {
-  console.log('Processing signout');
-  const result = await auth.signOut();
-  if (result && result.success) {
-    try {
-      if (fsSync.existsSync(AUTH_STORE_PATH)) fsSync.unlinkSync(AUTH_STORE_PATH);
-      console.log('Removed persisted auth tokens');
-    } catch (err) {
-      console.warn('Failed to remove persisted auth tokens:', err.message);
-    }
-  }
-  return result;
-});
-
-ipcMain.handle('auth-get-current-user', async () => {
-  const { data: { user } } = await auth.getCurrentUser();
-  return user;
-});
-
-ipcMain.handle('auth-get-session', async () => {
-  const { data: { session } } = await auth.getCurrentSession();
-  return session;
-});
-
-ipcMain.handle('auth-check-discord-server', async (event, userId) => {
-  return await auth.checkDiscordServerMembership(userId);
-});
-
-// Handle OAuth callback
-ipcMain.handle('auth-handle-callback', async (event, url) => {
+ipcMain.handle('catalog-download', async (event, buildData) => {
   try {
-    // Extract the authorization code from the URL
-    const urlObj = new URL(url);
-    const code = urlObj.searchParams.get('code');
-    const error = urlObj.searchParams.get('error');
-
-    if (error) {
-      return { success: false, error: `OAuth error: ${error}` };
+    const { downloadUrl, name, version } = buildData;
+    const buildsDir = path.join(app.getPath('userData'), 'builds');
+    
+    // Create builds directory if it doesn't exist
+    if (!fs.existsSync(buildsDir)) {
+      fs.mkdirSync(buildsDir, { recursive: true });
     }
-
-    if (!code) {
-      return { success: false, error: 'No authorization code received' };
-    }
-
-    // Exchange the code for a session
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (exchangeError) throw exchangeError;
-
-    return { success: true, session: data.session, user: data.user };
+    
+    // Determine file extension from URL
+    const urlPath = new URL(downloadUrl).pathname;
+    const ext = path.extname(urlPath) || '.zip';
+    const fileName = `${name.replace(/[^a-z0-9]/gi, '_')}${ext}`;
+    const filePath = path.join(buildsDir, fileName);
+    
+    console.log(`[Download] Starting download: ${name} from ${downloadUrl}`);
+    
+    // Start download with progress tracking
+    const response = await axios({
+      method: 'GET',
+      url: downloadUrl,
+      responseType: 'stream',
+      timeout: 30000,
+      maxRedirects: 5
+    });
+    
+    const totalSize = parseInt(response.headers['content-length'] || '0', 10);
+    let downloadedSize = 0;
+    let lastUpdate = Date.now();
+    
+    const writer = fs.createWriteStream(filePath);
+    
+    response.data.on('data', (chunk) => {
+      downloadedSize += chunk.length;
+      
+      // Send progress update every 2.5 seconds
+      const now = Date.now();
+      if (now - lastUpdate >= 2500) {
+        const progress = totalSize > 0 ? Math.round((downloadedSize / totalSize) * 100) : 0;
+        event.sender.send('download-progress', {
+          buildId: buildData.id,
+          progress,
+          downloaded: downloadedSize,
+          total: totalSize
+        });
+        lastUpdate = now;
+      }
+    });
+    
+    response.data.pipe(writer);
+    
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => {
+        console.log(`[Download] Completed: ${fileName}`);
+        event.sender.send('download-complete', {
+          buildId: buildData.id,
+          filePath,
+          name
+        });
+        resolve({ success: true, filePath, name });
+      });
+      
+      writer.on('error', (error) => {
+        console.error(`[Download] Error:`, error);
+        fs.unlinkSync(filePath).catch(() => {});
+        reject(error);
+      });
+    });
+    
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('[Catalog] Download failed:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to start download' 
+    };
   }
 });
 
-// Cancel download
-ipcMain.handle('cancel-download', async (event, buildId) => {
-  // For now, just return success - in a real implementation you'd need to track
-  // active downloads and cancel them properly
-  console.log(`Cancelling download for build: ${buildId}`);
-  return { success: true };
+// ============================================
+// SERVERS HANDLERS
+// ============================================
+ipcMain.handle('servers-get-all', async () => {
+  try {
+    const response = await axios.get(`${API_URL}/servers`, {
+      timeout: 5000
+    });
+    return response.data;
+  } catch (error) {
+    console.log('[Servers] Using fallback (matchmaking offline)');
+    return [];
+  }
 });
 
-// Database IPC handlers
-ipcMain.handle('db-get-user-profile', async (event, userId) => {
-  return await db.getUserProfile(userId);
+ipcMain.handle('servers-host', async (event, serverData) => {
+  try {
+    const response = await axios.post(`${API_URL}/servers/host`, serverData, {
+      timeout: 10000
+    });
+    return { success: true, server: response.data };
+  } catch (error) {
+    console.error('[Servers] Host failed:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to create server' 
+    };
+  }
 });
 
-ipcMain.handle('db-upsert-user-profile', async (event, { userId, profileData }) => {
-  return await db.upsertUserProfile(userId, profileData);
-});
-
-ipcMain.handle('db-get-download-history', async (event, userId) => {
-  return await db.getDownloadHistory(userId);
-});
-
-ipcMain.handle('db-add-download-history', async (event, { userId, buildId, buildName, buildVersion }) => {
-  return await db.addDownloadHistory(userId, buildId, buildName, buildVersion);
+ipcMain.handle('servers-join', async (event, serverId) => {
+  try {
+    const response = await axios.post(`${API_URL}/servers/${serverId}/join`, {
+      userId: currentAuthUser?.id
+    }, {
+      timeout: 10000
+    });
+    return { success: true, connection: response.data };
+  } catch (error) {
+    console.error('[Servers] Join failed:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to join server' 
+    };
+  }
 });

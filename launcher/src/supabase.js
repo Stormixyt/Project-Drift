@@ -1,111 +1,170 @@
-const { createClient } = require('@supabase/supabase-js');
+const Store = require('electron-store');
+const axios = require('axios');
 
-// Supabase configuration
-const supabaseUrl = 'https://asqrpypvszmgvhuyokxa.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcXJweXB2c3ptZ3ZodXlva3hhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0ODE0NTUsImV4cCI6MjA3NzA1NzQ1NX0.Ehs2qhwn5xHn_nl6EG6T_rgoxwRgLx630gX2TJP3mJQ';
+// Discord OAuth configuration
+const DISCORD_CLIENT_ID = '1432021829924552825';
+const DISCORD_CLIENT_SECRET = 'ZabkK80oVPUMWP_uO9RMTJtbAoBU6nsA';
+const REDIRECT_URI = 'http://localhost:3001/oauth-callback';
 
-// Initialize Supabase client
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create electron-store for session persistence
+const store = new Store({
+  name: 'auth',
+  defaults: {
+    session: null,
+    user: null
+  }
+});
 
 // Authentication functions
 const auth = {
   // Sign in with Discord OAuth
   async signInWithDiscord() {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'discord',
-        options: {
-          redirectTo: 'http://localhost:3001',
-          scopes: 'identify email guilds guilds.members.read'
-        }
+      // Generate state token for security
+      const state = Math.random().toString(36).substring(2);
+      store.set('oauth.state', state);
+
+      // Build Discord OAuth URL
+      const scopes = 'identify email guilds';
+      const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${state}`;
+
+      console.log('[Auth] Generated Discord OAuth URL');
+      return { success: true, url };
+    } catch (error) {
+      console.error('[Auth] Failed to generate OAuth URL:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Set session after OAuth callback
+  async setSession(accessToken, refreshToken) {
+    try {
+      console.log('[Auth] Setting session with access token');
+      
+      // Store tokens
+      const session = {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_at: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+      };
+      
+      store.set('session', session);
+      
+      // Get user data from Discord
+      const userResponse = await axios.get('https://discord.com/api/users/@me', {
+        headers: { Authorization: `Bearer ${accessToken}` }
       });
 
-      if (error) throw error;
-      // Return the URL that needs to be opened in browser
-      return { success: true, url: data.url };
+      const discordUser = userResponse.data;
+      const user = {
+        id: discordUser.id,
+        email: discordUser.email,
+        user_metadata: {
+          full_name: discordUser.username,
+          name: discordUser.username,
+          avatar: discordUser.avatar,
+          discriminator: discordUser.discriminator,
+          provider_id: discordUser.id,
+          avatar_url: discordUser.avatar 
+            ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+            : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator) % 5}.png`
+        }
+      };
+
+      store.set('user', user);
+      console.log('[Auth] ✓ Session set successfully for user:', user.user_metadata.name);
+
+      return { success: true, session, user };
     } catch (error) {
+      console.error('[Auth] Failed to set session:', error);
       return { success: false, error: error.message };
+    }
+  },
+
+  // Get current session
+  async getCurrentSession() {
+    try {
+      const session = store.get('session');
+      if (!session) {
+        return { data: { session: null } };
+      }
+
+      // Check if session is expired
+      if (session.expires_at && session.expires_at < Date.now()) {
+        console.log('[Auth] Session expired');
+        store.delete('session');
+        store.delete('user');
+        return { data: { session: null } };
+      }
+
+      return { data: { session } };
+    } catch (error) {
+      console.error('[Auth] Failed to get session:', error);
+      return { data: { session: null } };
+    }
+  },
+
+  // Get current user
+  async getCurrentUser() {
+    try {
+      const user = store.get('user');
+      return { data: { user: user || null } };
+    } catch (error) {
+      console.error('[Auth] Failed to get user:', error);
+      return { data: { user: null } };
     }
   },
 
   // Sign out
   async signOut() {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      store.delete('session');
+      store.delete('user');
+      store.delete('oauth.state');
+      console.log('[Auth] ✓ Signed out successfully');
       return { success: true };
     } catch (error) {
+      console.error('[Auth] Sign out failed:', error);
       return { success: false, error: error.message };
     }
-  },
-
-  // Get current user
-  getCurrentUser() {
-    return supabase.auth.getUser();
-  },
-
-  // Get current session
-  getCurrentSession() {
-    return supabase.auth.getSession();
-  },
-
-  // Set session with tokens
-  async setSession(accessToken, refreshToken) {
-    try {
-      const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      if (error) throw error;
-      return { success: true, data };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  },
-
-  // Listen to auth state changes
-  onAuthStateChange(callback) {
-    return supabase.auth.onAuthStateChange(callback);
   },
 
   // Check if user is in required Discord server
   async checkDiscordServerMembership(userId) {
     try {
-      // Get user's Discord guilds from metadata
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { success: false, error: 'No user found' };
+      const session = store.get('session');
+      if (!session || !session.access_token) {
+        return { success: false, isMember: false, error: 'Not authenticated' };
+      }
 
-      // Use the actual Discord server ID provided by user
-      const requiredGuildId = '1431737106761383938'; // Project Drift Discord server ID
-      
-      // For now, we'll check if the user has Discord metadata (indicating successful OAuth)
-      // In production, you'd verify against the actual server ID using Discord API
-      const hasDiscordData = user.user_metadata && 
-                            (user.user_metadata.full_name || user.user_metadata.avatar_url);
-      
-      // TODO: Replace with actual server membership check using Discord API
-      // For now, accept any Discord OAuth user
-      return { success: true, isMember: true };
+      // Get user's Discord guilds
+      const response = await axios.get('https://discord.com/api/users/@me/guilds', {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+
+      // Check if user is in Project Drift server
+      const PROJECT_DRIFT_SERVER_ID = '1431737106761383938';
+      const isMember = response.data.some(guild => guild.id === PROJECT_DRIFT_SERVER_ID);
+
+      console.log('[Auth] Discord server check:', { isMember, serverCount: response.data.length });
+      return { success: true, isMember };
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('[Auth] Failed to check server membership:', error);
+      return { success: false, isMember: false, error: error.message };
     }
   }
 };
 
-// Database functions
+// Database functions (using local storage)
 const db = {
   // Get user profile
   async getUserProfile(userId) {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
-      return { success: true, profile: data };
+      const profiles = store.get('profiles', {});
+      const profile = profiles[userId];
+      return { success: true, profile: profile || null };
     } catch (error) {
+      console.error('[DB] Failed to get profile:', error);
       return { success: false, error: error.message };
     }
   },
@@ -113,19 +172,17 @@ const db = {
   // Create or update user profile
   async upsertUserProfile(userId, profileData) {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: userId,
-          ...profileData,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) throw error;
-      return { success: true, profile: data };
+      const profiles = store.get('profiles', {});
+      profiles[userId] = {
+        user_id: userId,
+        ...profileData,
+        updated_at: new Date().toISOString()
+      };
+      store.set('profiles', profiles);
+      console.log('[DB] ✓ Profile saved for user:', userId);
+      return { success: true, profile: profiles[userId] };
     } catch (error) {
+      console.error('[DB] Failed to upsert profile:', error);
       return { success: false, error: error.message };
     }
   },
@@ -133,15 +190,11 @@ const db = {
   // Get user's download history
   async getDownloadHistory(userId) {
     try {
-      const { data, error } = await supabase
-        .from('download_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return { success: true, history: data };
+      const history = store.get('download_history', {});
+      const userHistory = history[userId] || [];
+      return { success: true, history: userHistory };
     } catch (error) {
+      console.error('[DB] Failed to get download history:', error);
       return { success: false, error: error.message };
     }
   },
@@ -149,25 +202,36 @@ const db = {
   // Add download to history
   async addDownloadHistory(userId, buildId, buildName, buildVersion) {
     try {
-      const { data, error } = await supabase
-        .from('download_history')
-        .insert({
-          user_id: userId,
-          build_id: buildId,
-          build_name: buildName,
-          build_version: buildVersion
-        });
-
-      if (error) throw error;
-      return { success: true, record: data };
+      const history = store.get('download_history', {});
+      if (!history[userId]) {
+        history[userId] = [];
+      }
+      
+      const record = {
+        build_id: buildId,
+        build_name: buildName,
+        build_version: buildVersion,
+        created_at: new Date().toISOString()
+      };
+      
+      history[userId].unshift(record); // Add to beginning
+      
+      // Keep only last 50 downloads
+      if (history[userId].length > 50) {
+        history[userId] = history[userId].slice(0, 50);
+      }
+      
+      store.set('download_history', history);
+      console.log('[DB] ✓ Added to download history:', buildName);
+      return { success: true, record };
     } catch (error) {
+      console.error('[DB] Failed to add download history:', error);
       return { success: false, error: error.message };
     }
   }
 };
 
 module.exports = {
-  supabase,
   auth,
   db
 };

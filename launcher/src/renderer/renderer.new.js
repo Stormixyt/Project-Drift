@@ -3,33 +3,6 @@ const { ipcRenderer } = require('electron');
 console.log('[Launcher] Perfect launcher loading...');
 
 // ============================================
-// WINDOW CONTROLS
-// ============================================
-document.addEventListener('DOMContentLoaded', () => {
-  const minimizeBtn = document.getElementById('minimize-btn');
-  const maximizeBtn = document.getElementById('maximize-btn');
-  const closeBtn = document.getElementById('close-btn');
-  
-  if (minimizeBtn) {
-    minimizeBtn.addEventListener('click', () => {
-      ipcRenderer.send('window-minimize');
-    });
-  }
-  
-  if (maximizeBtn) {
-    maximizeBtn.addEventListener('click', () => {
-      ipcRenderer.send('window-maximize');
-    });
-  }
-  
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      ipcRenderer.send('window-close');
-    });
-  }
-});
-
-// ============================================
 // STATE MANAGEMENT
 // ============================================
 let currentUser = null;
@@ -85,7 +58,6 @@ if (discordBtn) {
       if (result.success) {
         currentUser = result.user;
         console.log('[Auth] Discord login successful:', currentUser.username);
-        showToast('Welcome back!', `Signed in as ${currentUser.username}`, 'success');
         hideLoginModal();
         await initializeUI();
       } else {
@@ -93,7 +65,7 @@ if (discordBtn) {
       }
     } catch (error) {
       console.error('[Auth] Discord login failed:', error);
-      showToast('Login Failed', error.message, 'error');
+      alert('Failed to sign in with Discord:\n' + error.message);
       discordBtn.disabled = false;
       discordBtn.innerHTML = `
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -114,7 +86,6 @@ if (guestBtn) {
       username: 'Guest',
       provider: 'guest'
     };
-    showToast('Guest Mode', 'Continuing without account', 'info');
     hideLoginModal();
     initializeUI();
   });
@@ -128,7 +99,6 @@ async function signOut() {
     await ipcRenderer.invoke('auth-signout');
     currentUser = null;
     console.log('[Auth] Signed out successfully');
-    showToast('Signed Out', 'Come back soon!', 'info');
     
     // Reset UI
     showLoginModal();
@@ -143,7 +113,7 @@ async function signOut() {
     
   } catch (error) {
     console.error('[Auth] Sign out failed:', error);
-    showToast('Sign Out Failed', error.message, 'error');
+    alert('Failed to sign out: ' + error.message);
   }
 }
 
@@ -689,7 +659,7 @@ function renderCatalog(catalog) {
           <line x1="12" y1="15" x2="12" y2="3"></line>
         </svg>
         <h3>No builds available</h3>
-        <p>Loading builds from GitHub archive...</p>
+        <p>Check back later for new builds</p>
       </div>
     `;
     return;
@@ -704,118 +674,40 @@ function renderCatalog(catalog) {
   });
   
   container.innerHTML = '';
-  
-  // Sort seasons (newest first for numbered seasons)
-  const sortedSeasons = Object.entries(seasons).sort((a, b) => {
-    const aNum = parseInt(a[0].match(/\d+/)?.[0] || '0');
-    const bNum = parseInt(b[0].match(/\d+/)?.[0] || '0');
-    return bNum - aNum;
-  });
-  
-  sortedSeasons.forEach(([season, items]) => {
+  Object.entries(seasons).forEach(([season, items]) => {
     const seasonSection = document.createElement('div');
     seasonSection.className = 'catalog-season';
     
     seasonSection.innerHTML = `
-      <div class="season-header-wrapper">
-        <h3 class="season-header">${escapeHtml(season)}</h3>
-        <span class="season-count">${items.length} builds</span>
-      </div>
-      <div class="catalog-grid"></div>
+      <h3 class="season-header">${escapeHtml(season)}</h3>
+      <div class="catalog-list"></div>
     `;
     
-    const grid = seasonSection.querySelector('.catalog-grid');
+    const list = seasonSection.querySelector('.catalog-list');
     items.forEach(item => {
-      const card = document.createElement('div');
-      card.className = 'catalog-card';
-      card.setAttribute('data-build-id', item.id);
+      const row = document.createElement('div');
+      row.className = 'catalog-row';
       
-      card.innerHTML = `
-        <div class="catalog-card-header">
-          <div class="catalog-card-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-          </div>
-          <div class="catalog-card-info">
-            <h4 class="catalog-card-title">${escapeHtml(item.name)}</h4>
-            <p class="catalog-card-version">Version ${escapeHtml(item.version)} ${item.cl ? `• CL-${item.cl}` : ''}</p>
-          </div>
-        </div>
-        <div class="catalog-card-footer">
-          <button class="btn-download" onclick="downloadBuild('${item.id}', ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span>Download</span>
-          </button>
-        </div>
-        <div class="download-progress" style="display: none;">
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 0%"></div>
-          </div>
-          <div class="progress-text">0%</div>
-        </div>
+      row.innerHTML = `
+        <div>${escapeHtml(item.name || 'Unnamed')}</div>
+        <div>${escapeHtml(item.version || 'Unknown')}</div>
+        <div>${formatBytes(item.size || 0)}</div>
+        <button class="btn-primary" onclick="downloadBuild('${item.id}')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download
+        </button>
       `;
       
-      grid.appendChild(card);
+      list.appendChild(row);
     });
     
     container.appendChild(seasonSection);
   });
 }
-
-// Download build function
-window.downloadBuild = async function(buildId, buildData) {
-  try {
-    const card = document.querySelector(`[data-build-id="${buildId}"]`);
-    if (!card) return;
-    
-    const btn = card.querySelector('.btn-download');
-    const progressDiv = card.querySelector('.download-progress');
-    const progressFill = card.querySelector('.progress-fill');
-    const progressText = card.querySelector('.progress-text');
-    
-    // Show progress, hide button
-    btn.style.display = 'none';
-    progressDiv.style.display = 'block';
-    
-    const result = await ipcRenderer.invoke('catalog-download', JSON.parse(buildData.replace(/&quot;/g, '"')));
-    
-    if (result.success) {
-      showToast('Download Complete', `${result.name} has been downloaded successfully`, 'success');
-      progressDiv.style.display = 'none';
-      btn.style.display = 'flex';
-      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Downloaded</span>';
-      btn.disabled = true;
-    } else {
-      showToast('Download Failed', result.error, 'error');
-      progressDiv.style.display = 'none';
-      btn.style.display = 'flex';
-    }
-  } catch (error) {
-    console.error('[Download] Error:', error);
-    showToast('Download Failed', error.message, 'error');
-  }
-};
-
-// Listen for download progress updates
-ipcRenderer.on('download-progress', (event, data) => {
-  const card = document.querySelector(`[data-build-id="${data.buildId}"]`);
-  if (!card) return;
-  
-  const progressFill = card.querySelector('.progress-fill');
-  const progressText = card.querySelector('.progress-text');
-  
-  if (progressFill && progressText) {
-    progressFill.style.width = `${data.progress}%`;
-    progressText.textContent = `${data.progress}% • ${formatBytes(data.downloaded)} / ${formatBytes(data.total)}`;
-  }
-});
 
 window.downloadBuild = async function(buildId) {
   try {
@@ -857,58 +749,6 @@ if (launchArgsInput) {
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
-function showToast(title, message, type = 'info', duration = 4000) {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-  
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  
-  const icons = {
-    success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />',
-    error: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />',
-    warning: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />',
-    info: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />'
-  };
-  
-  toast.innerHTML = `
-    <div class="toast-icon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        ${icons[type] || icons.info}
-      </svg>
-    </div>
-    <div class="toast-content">
-      <div class="toast-title">${escapeHtml(title)}</div>
-      ${message ? `<div class="toast-message">${escapeHtml(message)}</div>` : ''}
-    </div>
-    <button class="toast-close">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M1 1 L13 13 M1 13 L13 1" stroke-linecap="round"/>
-      </svg>
-    </button>
-  `;
-  
-  const closeBtn = toast.querySelector('.toast-close');
-  closeBtn.addEventListener('click', () => {
-    removeToast(toast);
-  });
-  
-  container.appendChild(toast);
-  
-  if (duration > 0) {
-    setTimeout(() => {
-      removeToast(toast);
-    }, duration);
-  }
-}
-
-function removeToast(toast) {
-  toast.classList.add('removing');
-  setTimeout(() => {
-    toast.remove();
-  }, 300);
-}
-
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;

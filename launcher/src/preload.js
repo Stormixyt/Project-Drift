@@ -1,6 +1,8 @@
 // Preload script for secure IPC communication
 const { contextBridge, ipcRenderer } = require('electron');
 
+console.log('[Preload] Loading preload script...');
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -43,17 +45,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 
 // Also expose ipcRenderer directly for compatibility (less secure but needed for existing code)
-contextBridge.exposeInMainWorld('ipcRenderer', {
+contextBridge.exposeInMainWorld('__ipcRenderer', {
   invoke: (channel, ...args) => {
     // Whitelist of allowed channels
     const validChannels = [
       'auth-signin-discord', 'auth-signout', 'auth-get-current-user', 'auth-get-session',
-      'auth-handle-callback', 'auth-check-discord-server',
+      'auth-handle-callback', 'auth-check-discord-server', 'auth-signup', 'auth-signin',
       'db-get-user-profile', 'db-upsert-user-profile', 'db-get-download-history', 'db-add-download-history',
       'select-download-path', 'get-default-download-path',
-      'start-download', 'cancel-download', 'get-download-progress',
+      'import-build', 'delete-build', 'get-builds', 'download-build', 'launch-game',
+      'cancel-download', 'get-download-progress',
       'start-server', 'stop-server', 'get-server-status',
-      'load-settings', 'save-settings'
+      'get-server-settings', 'save-server-settings', 'get-server-list', 'join-server',
+      'get-local-catalog', 'open-url'
     ];
 
     if (validChannels.includes(channel)) {
@@ -62,12 +66,22 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
   on: (channel, func) => {
     // Whitelist of allowed channels for listening
-    const validChannels = ['oauth-callback'];
+    const validChannels = ['oauth-callback', 'oauth-success', 'oauth-error', 'download-progress', 'download-status', 'import-status'];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, func);
+    }
+  },
+  send: (channel, ...args) => {
+    // Whitelist for send (one-way messages)
+    const validChannels = ['window-minimize', 'window-maximize', 'window-close'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.send(channel, ...args);
     }
   },
   removeAllListeners: (channel) => {
     ipcRenderer.removeAllListeners(channel);
   }
 });
+
+console.log('[Preload] ✓ __ipcRenderer exposed to window.__ipcRenderer');
+console.log('[Preload] ✓ electronAPI exposed to window.electronAPI');
