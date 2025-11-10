@@ -9,17 +9,17 @@
 
 Project Drift is a production-ready multiplayer framework that enables players to experience custom game builds through private servers. Whether you want to play older versions of games or test custom modifications, Project Drift provides the infrastructure to host locally or globally with full NAT traversal support.
 
-### Key Features
+### ✅ Working Features
 
-- **Custom Build Support**: Import and run game builds from GitHub repos or local files
-- **MCP Backend**: Project Reboot-style Epic Games service emulation (no launcher crashes!)
-- **P2P Matchmaking**: Auto-host servers when you open a game, join friends directly
-- **Authoritative Server**: Rust-based 30-60Hz tick server with deterministic physics
-- **NAT Traversal**: Automatic STUN/TURN fallback for global connectivity
-- **Anti-Cheat**: Built-in velocity and teleport detection
-- **Modern Admin UI**: React dashboard with real-time server management
-- **Sandbox Execution**: Imported builds run in isolated environments
-- **One-Command Setup**: Get started with `./start-with-mcp.ps1`
+- ✅ **DLL Injection System**: Starfall bypass injection finally works with proper timing and error handling
+- ✅ **Momentum Backend**: Full Epic Games service emulation (MCP, XMPP, Discord bot integration)
+- ✅ **Discord Authentication**: OAuth login with account management via Discord commands
+- ✅ **Cloud Features**: Shop rotation, item management, profile synchronization
+- ✅ **P2P Matchmaking**: Auto-host servers when you open a game, join friends directly
+- ✅ **Standalone Installer**: One-click installation with no developer tools required
+- ✅ **Custom Build Support**: Import and run game builds from GitHub repos or local files
+- ✅ **Modern Electron Launcher**: Beautiful UI with Discord integration and build management
+- ✅ **One-Command Setup**: Get started with `./start-with-mcp.ps1`
 
 ## Architecture
 
@@ -331,8 +331,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Stormixyt/project-drift/issues)
-- **Discord**: [Join our server](https://discord.gg/4mN7ChNJQf))
+- **Issues**: [GitHub Issues](https://github.com/yourusername/project-drift/issues)
+- **Discord**: [Join our server](https://discord.gg/project-drift)
 - **Documentation**: [Full docs](docs/)
 
 ---
