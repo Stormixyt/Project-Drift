@@ -1,0 +1,24 @@
+{
+  "lastUpdated": "2025-11-11T15:00:00Z",
+  "message": "The servers will be online when mentioned in the discord server, the first test will be in about a month or so. Stay tuned!",
+  "gameServer": {
+    "status": "offline",
+    "ping": 45
+  },
+  "mcpBackend": {
+    "status": "offline",
+    "ping": 32
+  },
+  "matchmaking": {
+    "status": "offline",
+    "ping": 28
+  },
+  "authentication": {
+    "status": "offline",
+    "ping": 15
+  },
+  "cdn": {
+    "status": "offline",
+    "ping": 12
+  }
+}
